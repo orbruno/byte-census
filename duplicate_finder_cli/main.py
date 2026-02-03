@@ -236,7 +236,7 @@ def calculate_statistics(duplicates: Dict) -> Dict:
     }
 
 
-def format_table_output(duplicates: Dict, stats: Dict, compare_mode: bool = False):
+def format_table_output(duplicates: Dict, stats: Dict, compare_mode: bool = False) -> None:
     """Display duplicates in rich table format."""
     if not duplicates:
         console.print("[green]✓ No duplicates found![/green]")
@@ -334,7 +334,15 @@ def format_bytes(size: int) -> str:
               help='Minimum file size in bytes to consider (default: 0)')
 @click.option('--quiet', '-q', is_flag=True,
               help='Suppress progress output, only show results')
-def find(path, compare, recursive, format, output, min_size, quiet):
+def find(
+    path: Path,
+    compare: Path | None,
+    recursive: bool,
+    format: str,
+    output: Path | None,
+    min_size: int,
+    quiet: bool
+) -> None:
     """
     Find duplicate files using cryptographic hashing.
 
@@ -415,7 +423,7 @@ def find(path, compare, recursive, format, output, min_size, quiet):
         raise
 
 
-def cli():
+def cli() -> None:
     """Entry point for the CLI."""
     find()
 
