@@ -1,11 +1,11 @@
 """Main CLI implementation for duplicate file finder."""
 
+import csv
 import hashlib
 import io
 import json
-import csv
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 from typing import TypedDict
 
 import click
@@ -13,16 +13,18 @@ from rich.console import Console
 from rich.progress import track
 
 console = Console()
+status_console = Console(stderr=True)
 
 
 class DuplicateStats(TypedDict):
+    files_scanned: int
     duplicate_groups: int
     duplicate_files: int
     wasted_bytes: int
     wasted_human: str
 
 
-def calculate_hash(file_path: Path, algorithm: str = 'sha256') -> str:
+def calculate_hash(file_path: Path, algorithm: str = "sha256") -> str:
     """
     Calculate cryptographic hash of a file using chunked reading.
 
@@ -39,9 +41,9 @@ def calculate_hash(file_path: Path, algorithm: str = 'sha256') -> str:
     hash_func = hashlib.new(algorithm)
 
     try:
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             # Read in 8KB chunks to handle large files efficiently
-            for chunk in iter(lambda: f.read(8192), b''):
+            for chunk in iter(lambda: f.read(8192), b""):
                 hash_func.update(chunk)
         return hash_func.hexdigest()
     except (IOError, PermissionError) as e:
@@ -65,6 +67,9 @@ def collect_files(path: Path, recursive: bool = True, min_size: int = 0) -> list
     if not path.exists():
         raise FileNotFoundError(f"Path does not exist: {path}")
 
+    if path.is_symlink():
+        return []
+
     if path.is_file():
         # Single file provided
         if path.stat().st_size >= min_size:
@@ -72,7 +77,7 @@ def collect_files(path: Path, recursive: bool = True, min_size: int = 0) -> list
         return []
 
     # Directory scanning
-    pattern = '**/*' if recursive else '*'
+    pattern = "**/*" if recursive else "*"
 
     for item in path.glob(pattern):
         # Skip directories and symlinks
@@ -84,15 +89,29 @@ def collect_files(path: Path, recursive: bool = True, min_size: int = 0) -> list
                 # Skip files we can't stat
                 continue
 
-    return files
+    return sorted(files)
+
+
+def group_files_by_size(files: list[Path]) -> tuple[dict[int, list[Path]], list[str]]:
+    """Group readable files by size before content hashing."""
+    size_groups: defaultdict[int, list[Path]] = defaultdict(list)
+    errors: list[str] = []
+
+    for file_path in files:
+        try:
+            size_groups[file_path.stat().st_size].append(file_path)
+        except OSError as error:
+            errors.append(f"Cannot stat file {file_path}: {error}")
+
+    return dict(size_groups), errors
 
 
 def find_duplicates_single(
     path: Path,
     recursive: bool = True,
     min_size: int = 0,
-    quiet: bool = False
-) -> tuple[dict[str, list[Path]], list[str]]:
+    quiet: bool = False,
+) -> tuple[dict[str, list[Path]], list[str], int]:
     """
     Find duplicate files within a single directory.
 
@@ -103,21 +122,31 @@ def find_duplicates_single(
         quiet: Suppress progress output
 
     Returns:
-        Tuple of (duplicates_dict, errors_list)
+        Tuple of (duplicates_dict, errors_list, files_scanned)
         duplicates_dict: {hash: [file_paths]} for files with duplicates
         errors_list: List of error messages for files that couldn't be processed
     """
-    hash_map = defaultdict(list)
-    errors = []
+    hash_map: defaultdict[str, list[Path]] = defaultdict(list)
 
     # Collect files
     files = collect_files(path, recursive, min_size)
 
     if not files:
-        return {}, []
+        return {}, [], 0
 
-    # Hash all files
-    file_iterator = track(files, description="Hashing files...") if not quiet else files
+    size_groups, errors = group_files_by_size(files)
+    candidates = sorted(
+        file_path
+        for same_size_files in size_groups.values()
+        if len(same_size_files) > 1
+        for file_path in same_size_files
+    )
+
+    file_iterator = (
+        track(candidates, description="Hashing files...", console=status_console)
+        if not quiet
+        else candidates
+    )
 
     for file_path in file_iterator:
         try:
@@ -130,7 +159,7 @@ def find_duplicates_single(
     # Filter to only duplicates (hashes with >1 file)
     duplicates = {h: paths for h, paths in hash_map.items() if len(paths) > 1}
 
-    return duplicates, errors
+    return duplicates, errors, len(files)
 
 
 def find_duplicates_compare(
@@ -138,8 +167,8 @@ def find_duplicates_compare(
     path2: Path,
     recursive: bool = True,
     min_size: int = 0,
-    quiet: bool = False
-) -> tuple[dict[str, list[Path]], list[str]]:
+    quiet: bool = False,
+) -> tuple[dict[str, list[Path]], list[str], int]:
     """
     Find duplicate files between two directories.
 
@@ -151,21 +180,42 @@ def find_duplicates_compare(
         quiet: Suppress progress output
 
     Returns:
-        Tuple of (duplicates_dict, errors_list)
+        Tuple of (duplicates_dict, errors_list, files_scanned)
         duplicates_dict: {hash: [all_matching_files]} (flattened from both dirs)
         errors_list: List of error messages
     """
     hash_map1: defaultdict[str, list[Path]] = defaultdict(list)
     hash_map2: defaultdict[str, list[Path]] = defaultdict(list)
-    errors: list[str] = []
-
     files1 = collect_files(path1, recursive, min_size)
     files2 = collect_files(path2, recursive, min_size)
+    size_groups1, errors1 = group_files_by_size(files1)
+    size_groups2, errors2 = group_files_by_size(files2)
+    errors = errors1 + errors2
+
+    common_sizes = set(size_groups1) & set(size_groups2)
+    candidates1 = sorted(
+        file_path for size in common_sizes for file_path in size_groups1[size]
+    )
+    candidates2 = sorted(
+        file_path for size in common_sizes for file_path in size_groups2[size]
+    )
 
     if not quiet:
-        console.print(f"[cyan]Hashing {len(files1)} files from {path1}...[/cyan]")
+        status_console.print(
+            f"Hashing {len(candidates1)} candidate files from {path1}...",
+            style="cyan",
+            markup=False,
+        )
 
-    for file_path in (track(files1, description="Hashing directory 1...") if not quiet else files1):
+    for file_path in (
+        track(
+            candidates1,
+            description="Hashing directory 1...",
+            console=status_console,
+        )
+        if not quiet
+        else candidates1
+    ):
         try:
             file_hash = calculate_hash(file_path)
             hash_map1[file_hash].append(file_path)
@@ -173,26 +223,40 @@ def find_duplicates_compare(
             errors.append(str(e))
 
     if not quiet:
-        console.print(f"[cyan]Hashing {len(files2)} files from {path2}...[/cyan]")
+        status_console.print(
+            f"Hashing {len(candidates2)} candidate files from {path2}...",
+            style="cyan",
+            markup=False,
+        )
 
-    for file_path in (track(files2, description="Hashing directory 2...") if not quiet else files2):
+    for file_path in (
+        track(
+            candidates2,
+            description="Hashing directory 2...",
+            console=status_console,
+        )
+        if not quiet
+        else candidates2
+    ):
         try:
             file_hash = calculate_hash(file_path)
             hash_map2[file_hash].append(file_path)
         except IOError as e:
             errors.append(str(e))
 
-    common_hashes = set(hash_map1.keys()) & set(hash_map2.keys())
+    common_hashes = sorted(set(hash_map1) & set(hash_map2))
 
     duplicates = {
-        h: hash_map1[h] + hash_map2[h]
-        for h in common_hashes
+        file_hash: hash_map1[file_hash] + hash_map2[file_hash]
+        for file_hash in common_hashes
     }
 
-    return duplicates, errors
+    return duplicates, errors, len(files1) + len(files2)
 
 
-def calculate_statistics(duplicates: dict[str, list[Path]]) -> DuplicateStats:
+def calculate_statistics(
+    duplicates: dict[str, list[Path]], files_scanned: int = 0
+) -> DuplicateStats:
     """
     Calculate statistics about duplicates.
 
@@ -214,47 +278,66 @@ def calculate_statistics(duplicates: dict[str, list[Path]]) -> DuplicateStats:
             wasted_bytes += (len(files) - 1) * file_size
 
     return {
-        'duplicate_groups': total_groups,
-        'duplicate_files': total_files,
-        'wasted_bytes': wasted_bytes,
-        'wasted_human': format_bytes(wasted_bytes),
+        "files_scanned": files_scanned,
+        "duplicate_groups": total_groups,
+        "duplicate_files": total_files,
+        "wasted_bytes": wasted_bytes,
+        "wasted_human": format_bytes(wasted_bytes),
     }
 
 
-def format_table_output(duplicates: dict[str, list[Path]], stats: DuplicateStats) -> None:
+def format_table_output(
+    duplicates: dict[str, list[Path]],
+    stats: DuplicateStats,
+    output_console: Console = console,
+) -> None:
     """Display duplicates in rich table format."""
     if not duplicates:
-        console.print("[green]✓ No duplicates found![/green]")
+        output_console.print("[green]✓ No duplicates found![/green]")
         return
 
-    console.print(f"\n[bold cyan]Found {stats['duplicate_groups']} duplicate groups "
-                  f"({stats['duplicate_files']} files, {stats['wasted_human']} wasted)[/bold cyan]\n")
+    output_console.print(
+        f"\n[bold cyan]Found {stats['duplicate_groups']} duplicate groups "
+        f"({stats['duplicate_files']} files, {stats['wasted_human']} wasted)[/bold cyan]\n"
+    )
 
     for file_hash, files in duplicates.items():
         file_size = files[0].stat().st_size
         size_human = format_bytes(file_size)
 
-        console.print(f"[yellow]Hash:[/yellow] {file_hash[:12]}... "
-                     f"[dim]({len(files)} files, {size_human} each)[/dim]")
+        output_console.print(
+            f"[yellow]Hash:[/yellow] {file_hash[:12]}... "
+            f"[dim]({len(files)} files, {size_human} each)[/dim]"
+        )
 
         for file_path in files:
-            console.print(f"  {file_path}")
+            output_console.print(f"  {file_path}", markup=False)
 
-        console.print()
+        output_console.print()
+
+
+def format_table_text(duplicates: dict[str, list[Path]], stats: DuplicateStats) -> str:
+    """Render table output as plain text for file output."""
+    output = io.StringIO()
+    file_console = Console(
+        file=output,
+        color_system=None,
+        force_terminal=False,
+        width=200,
+    )
+    format_table_output(duplicates, stats, file_console)
+    return output.getvalue()
 
 
 def format_json_output(duplicates: dict[str, list[Path]], stats: DuplicateStats) -> str:
     """Format duplicates as JSON."""
-    output: dict = {
-        'summary': stats,
-        'duplicates': {}
-    }
+    output: dict = {"summary": stats, "duplicates": {}}
 
     for file_hash, files in duplicates.items():
-        output['duplicates'][file_hash] = {
-            'count': len(files),
-            'size': files[0].stat().st_size,
-            'files': [str(f) for f in files]
+        output["duplicates"][file_hash] = {
+            "count": len(files),
+            "size": files[0].stat().st_size,
+            "files": [str(f) for f in files],
         }
 
     return json.dumps(output, indent=2)
@@ -273,7 +356,7 @@ def format_csv_output(duplicates: dict[str, list[Path]]) -> str:
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['hash', 'file_count', 'size_bytes', 'file_path'])
+    writer.writerow(["hash", "file_count", "size_bytes", "file_path"])
     writer.writerows(rows)
 
     return output.getvalue()
@@ -282,7 +365,7 @@ def format_csv_output(duplicates: dict[str, list[Path]]) -> str:
 def format_bytes(num_bytes: int) -> str:
     """Convert bytes to human-readable format."""
     size = float(num_bytes)
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size < 1024.0:
             return f"{size:.1f} {unit}"
         size /= 1024.0
@@ -290,20 +373,42 @@ def format_bytes(num_bytes: int) -> str:
 
 
 @click.command()
-@click.argument('path', type=click.Path(exists=True, path_type=Path))
-@click.option('--compare', '-c', type=click.Path(exists=True, path_type=Path),
-              help='Compare with another directory to find duplicates between them')
-@click.option('--recursive/--no-recursive', '-r/-R', default=True,
-              help='Search recursively in subdirectories (default: recursive)')
-@click.option('--format', '-f', 'output_format',
-              type=click.Choice(['table', 'json', 'csv'], case_sensitive=False),
-              default='table', help='Output format (default: table)')
-@click.option('--output', '-o', type=click.Path(path_type=Path),
-              help='Save results to file instead of stdout')
-@click.option('--min-size', type=int, default=0,
-              help='Minimum file size in bytes to consider (default: 0)')
-@click.option('--quiet', '-q', is_flag=True,
-              help='Suppress progress output, only show results')
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--compare",
+    "-c",
+    type=click.Path(exists=True, path_type=Path),
+    help="Compare with another directory to find duplicates between them",
+)
+@click.option(
+    "--recursive/--no-recursive",
+    "-r/-R",
+    default=True,
+    help="Search recursively in subdirectories (default: recursive)",
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["table", "json", "csv"], case_sensitive=False),
+    default="table",
+    help="Output format (default: table)",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(path_type=Path),
+    help="Save results to file instead of stdout",
+)
+@click.option(
+    "--min-size",
+    type=click.IntRange(min=0),
+    default=0,
+    help="Minimum file size in bytes to consider (default: 0)",
+)
+@click.option(
+    "--quiet", "-q", is_flag=True, help="Suppress progress output, only show results"
+)
 def find(
     path: Path,
     compare: Path | None,
@@ -311,7 +416,7 @@ def find(
     output_format: str,
     output: Path | None,
     min_size: int,
-    quiet: bool
+    quiet: bool,
 ) -> None:
     """
     Find duplicate files using cryptographic hashing.
@@ -342,43 +447,51 @@ def find(
     """
     try:
         if compare:
-            duplicates, errors = find_duplicates_compare(
+            duplicates, errors, files_scanned = find_duplicates_compare(
                 path, compare, recursive, min_size, quiet
             )
         else:
-            duplicates, errors = find_duplicates_single(
+            duplicates, errors, files_scanned = find_duplicates_single(
                 path, recursive, min_size, quiet
             )
 
-        stats = calculate_statistics(duplicates)
+        stats = calculate_statistics(duplicates, files_scanned)
 
         output_text: str | None = None
-        if output_format == 'table':
-            format_table_output(duplicates, stats)
-        elif output_format == 'json':
+        if output_format == "table":
+            if output:
+                output_text = format_table_text(duplicates, stats)
+            else:
+                format_table_output(duplicates, stats)
+        elif output_format == "json":
             output_text = format_json_output(duplicates, stats)
-        elif output_format == 'csv':
+        elif output_format == "csv":
             output_text = format_csv_output(duplicates)
 
         if output:
-            if output_text:
-                output.write_text(output_text)
-                console.print(f"[green]✓ Results saved to {output}[/green]")
-            else:
-                console.print("[red]✗ Cannot save table format to file. Use --format json or csv[/red]")
-        elif output_text:
-            console.print(output_text)
+            try:
+                output.write_text(output_text or "", encoding="utf-8")
+            except OSError as error:
+                raise click.ClickException(
+                    f"Cannot write output file {output}: {error}"
+                ) from error
+            status_console.print(
+                f"✓ Results saved to {output}", style="green", markup=False
+            )
+        elif output_text is not None:
+            click.echo(output_text, nl=not output_text.endswith("\n"))
 
-        if errors and not quiet:
-            console.print(f"\n[yellow]⚠ Encountered {len(errors)} errors:[/yellow]")
+        if errors:
+            status_console.print(
+                f"\n⚠ Encountered {len(errors)} errors:", style="yellow", markup=False
+            )
             for error in errors[:10]:
-                console.print(f"  {error}")
+                status_console.print(f"  {error}", markup=False)
             if len(errors) > 10:
-                console.print(f"  ... and {len(errors) - 10} more")
+                status_console.print(f"  ... and {len(errors) - 10} more", markup=False)
 
     except FileNotFoundError as e:
-        console.print(f"[red]✗ Error: {e}[/red]")
-        raise click.Abort()
+        raise click.ClickException(str(e)) from e
 
 
 def cli() -> None:
@@ -386,5 +499,5 @@ def cli() -> None:
     find()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

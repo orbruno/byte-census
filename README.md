@@ -2,6 +2,10 @@
 
 A fast, reliable command-line tool for finding duplicate files using cryptographic hashing (SHA256).
 
+Delivery: Functional
+Version: 1.0.0
+Verification: Nine unit and CLI regressions passed on 2026-08-28
+
 ## Features
 
 - **Hash-based detection**: Uses SHA256 for accurate duplicate identification regardless of filename
@@ -15,25 +19,22 @@ A fast, reliable command-line tool for finding duplicate files using cryptograph
 
 ## Installation
 
-### Using UV (Recommended)
+### Project environment
 
 ```bash
 cd duplicate-finder-cli
 uv sync
+uv run dupfind --help
 ```
 
-This will:
-- Create a virtual environment
-- Install all dependencies
-- Make the `dupfind` command available
+This creates the project environment and runs the command through the locked
+dependencies.
 
-### Manual Installation
+### Global tool installation
 
 ```bash
-cd duplicate-finder-cli
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -e .
+uv tool install .
+dupfind --help
 ```
 
 ## Usage
@@ -95,6 +96,9 @@ dupfind /path --format csv
 dupfind /path --format csv --output duplicates.csv
 ```
 
+JSON and CSV results are written without terminal styling or line wrapping.
+Progress and diagnostics use stderr so stdout remains machine-readable.
+
 ### Combined Examples
 
 ```bash
@@ -128,6 +132,7 @@ Hash: 9d2e1f4... (2 files, 7.2 MB each)
 ```json
 {
   "summary": {
+    "files_scanned": 1250,
     "duplicate_groups": 3,
     "duplicate_files": 6,
     "wasted_bytes": 47448064,
@@ -178,10 +183,11 @@ Options:
 ## How It Works
 
 1. **File Collection**: Scans the specified directory for files, optionally recursively
-2. **Hash Calculation**: Computes SHA256 hash for each file using chunked reading (8KB chunks)
-3. **Duplicate Detection**: Groups files by hash; files with identical hashes are duplicates
-4. **Statistics**: Calculates wasted space (duplicate files × file size)
-5. **Output**: Presents results in requested format
+2. **Size Pre-check**: Hashes only files whose sizes can contain duplicate candidates
+3. **Hash Calculation**: Computes SHA256 using chunked reading (8KB chunks)
+4. **Duplicate Detection**: Groups files by hash; files with identical hashes are duplicates
+5. **Statistics**: Calculates files scanned and potential wasted space
+6. **Output**: Presents results in the requested format
 
 ### Why SHA256?
 
@@ -233,7 +239,14 @@ See [SPECIFICATION.md](SPECIFICATION.md) for the complete specification, test ca
 
 ## License
 
-MIT License (or specify your preferred license)
+No license file is currently included. Choose a license before distributing the
+project for third-party reuse.
+
+## Verification
+
+```bash
+uv run python -m unittest -v
+```
 
 ---
 
