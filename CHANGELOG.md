@@ -35,6 +35,11 @@ All notable changes to this project are recorded here.
 
 ### Added
 
+- Cleanup suggestion catalog (`byte_census.suggestions`): nine immutable entries
+  (docker, uv, brew, npm, artifact, duplicate) with risk, reversibility, and
+  reason, pure builders for check-wide and per-finding suggestions, and the
+  low-to-high risk ordering. Suggestions are text only, always require owner
+  authorization, and never reach the runner.
 - Snapshot test helper (`tests/support/snapshots.py`) that normalizes
   `captured_at`, `cost`, `scope.st_dev`, and fixture roots; snapshots update
   only with `BYTE_CENSUS_UPDATE_SNAPSHOTS=1`.
