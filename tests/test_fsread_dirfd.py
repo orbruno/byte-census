@@ -451,3 +451,52 @@ def test_open_beneath_with_a_file_as_root_is_a_read_error(tmp_path: Path) -> Non
 def test_open_beneath_reports_a_vanished_file(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         fsread.hash_file_beneath(tmp_path, tmp_path / "missing.txt")
+
+
+def test_failed_reopen_does_not_apply_a_consumed_name_to_an_ancestor(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A deep ancestor changes while its descriptor is evicted.
+
+    With FD_CAP=1 only the deepest directory keeps a descriptor. When the walk
+    returns to `d0/d1` it must reopen `d0`, which was replaced meanwhile. The
+    name it had already taken from `d1` (`z`) must not be looked up in the
+    surviving root, where `z` also exists: that would report a path the walk
+    never listed there, or visit `root/z` twice.
+    """
+    root = tmp_path / "root"
+    deep = root / "d0" / "d1" / "d2"
+    deep.mkdir(parents=True)
+    (deep / "leaf.txt").write_text("leaf")
+    (root / "d0" / "d1" / "z").write_text("in d1")
+    (root / "z").mkdir()
+    (root / "z" / "f.txt").write_text("f")
+    monkeypatch.setattr(fsread, "FD_CAP", 1)
+    real = fsread._entry_lstat
+    d0 = root / "d0"
+
+    def replace_d0(entry: Any) -> Any:
+        info = real(entry)
+        if entry.path == str(deep / "leaf.txt"):
+            os.rename(d0, root / "d0-old")
+            d0.mkdir()
+        return info
+
+    monkeypatch.setattr(fsread, "_entry_lstat", replace_d0)
+
+    items = list(walk(root))
+    listed = paths(items)
+
+    assert listed == [
+        str(d0),
+        str(d0 / "d1"),
+        str(deep),
+        str(deep / "leaf.txt"),
+        str(d0),
+        str(root / "z"),
+        str(root / "z" / "f.txt"),
+    ]
+    entries = [i.path for i in items if isinstance(i, WalkEntry)]
+    assert len(entries) == len(set(entries))
+    errors = [i for i in items if isinstance(i, WalkError)]
+    assert errors == [WalkError(str(d0), "scandir", CHANGED, None)]

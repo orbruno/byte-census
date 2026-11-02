@@ -141,6 +141,11 @@ All notable changes to this project are recorded here.
 
 ### Security
 
+- Fix: after a changed ancestor ends a deep branch whose descriptors were
+  evicted, the walker no longer looks up the name it had already taken from
+  the dropped directory in a surviving ancestor, which could report a path
+  that was never listed there or visit a sibling twice.
+
 - `fsread.walk` accepts `prune`, and the new `fsread.walk_beneath` reaches a
   directory below a scan root through an `O_NOFOLLOW` openat chain, checks
   its identity, and walks it on the scan root's device. Disk map's pruned

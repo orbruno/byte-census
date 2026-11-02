@@ -424,15 +424,18 @@ def _drain(
     stack: list[_Frame], root_fd: int, root_dev: int, prune: Prune
 ) -> Iterator[WalkItem]:
     while stack:
-        name = next(stack[-1].names, None)
+        frame = stack[-1]
+        name = next(frame.names, None)
         if name is None:
-            frame = stack.pop()
+            stack.pop()
             if stack and frame.fd is not None:
                 os.close(frame.fd)
             continue
-        if stack[-1].fd is None:
+        if frame.fd is None:
             yield from _ensure_top_open(stack, root_fd)
-            if stack[-1].fd is None:
+            # `name` belongs to `frame`. If recovery dropped that frame (a
+            # changed ancestor), the name must not be looked up anywhere else.
+            if not stack or stack[-1].names is not frame.names:
                 continue
         items, child = _step(stack[-1], name, root_dev, prune)
         if child is not None:
