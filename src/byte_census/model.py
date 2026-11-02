@@ -29,6 +29,7 @@ EXIT_CODES: Mapping[str, int] = {
     "source_unavailable": 4,
 }
 PARTIAL_SOURCE_REASONS = frozenset({"failed", "timed_out"})
+_INF = float("inf")
 JSON_SCALARS = (str, int, float, bool, type(None))
 
 
@@ -51,7 +52,7 @@ class FrozenMap(Mapping[str, Any]):
         return len(self.pairs)
 
     def __hash__(self) -> int:
-        return hash(self.pairs)
+        return hash(frozenset(self.pairs))
 
 
 EMPTY = FrozenMap()
@@ -66,6 +67,8 @@ def freeze(value: Any) -> Any:
         return FrozenMap(tuple((key, freeze(item)) for key, item in value.items()))
     if isinstance(value, (list, tuple)):
         return tuple(freeze(item) for item in value)
+    if isinstance(value, float) and not -_INF < value < _INF:
+        raise ValueError(f"non-finite float is not a JSON value: {value!r}")
     if isinstance(value, JSON_SCALARS):
         return value
     raise TypeError(f"not a JSON value: {type(value).__name__}")

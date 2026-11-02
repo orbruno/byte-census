@@ -461,3 +461,20 @@ def test_freeze_rejects_non_json_values(value: Any) -> None:
 def test_finding_rejects_non_json_details() -> None:
     with pytest.raises(TypeError):
         Finding("x", "k", "/t", details={"s": {1, 2}})
+
+
+def test_frozen_map_hash_ignores_insertion_order() -> None:
+    first = freeze({"a": 1, "b": [1, 2]})
+    second = freeze({"b": [1, 2], "a": 1})
+
+    assert first == second
+    assert hash(first) == hash(second)
+    assert len({first, second}) == 1
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_freeze_rejects_non_finite_floats(value: float) -> None:
+    with pytest.raises(ValueError):
+        freeze({"key": value})
+    with pytest.raises(ValueError):
+        freeze([value])

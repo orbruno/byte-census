@@ -1,15 +1,19 @@
 """Suggestion catalog, builders, ordering, and isolation (WI-SUGGESTIONS)."""
 
 import ast
+import inspect
 import json
 import re
+import shlex
+import subprocess
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
 
-from byte_census import suggestions
+from byte_census import runner, suggestions
 from byte_census.model import Suggestion
+from byte_census.runner import RejectedArgvError, match_template
 from byte_census.suggestions import (
     CATALOG,
     build_artifact_suggestion,
@@ -75,8 +79,6 @@ def test_suggestions_always_require_owner_authorization() -> None:
     assert built.requires_owner_authorization is True
     with pytest.raises(ValueError):
         Suggestion("x", "c", "low", False, "r", requires_owner_authorization=False)
-    import inspect
-
     for fn in (build_check_wide, build_artifact_suggestion, build_duplicate_suggestion):
         assert "requires_owner_authorization" not in inspect.signature(fn).parameters
 
@@ -126,7 +128,9 @@ def test_per_finding_id_is_catalog_id_at_finding_id() -> None:
 
 
 def test_quoting_escapes_single_quotes() -> None:
-    built = build_artifact_suggestion("art-1", "/p/it's/node_modules", "/p/it's", "x")
+    built = build_artifact_suggestion(
+        "art-1", "/p/it's/node_modules", "/p/it's", "npm install"
+    )
     assert "'/p/it'\\''s/node_modules'" in built.command
 
 
@@ -170,9 +174,6 @@ def test_examples_are_already_in_contract_order() -> None:
         assert [s.id for s in order_suggestions(built)] == [s["id"] for s in raw]
 
 
-FORBIDDEN_MODULES = {"subprocess", "os", "shutil", "byte_census.runner"}
-
-
 def _imports(tree: ast.AST) -> set[str]:
     found: set[str] = set()
     for node in ast.walk(tree):
@@ -214,3 +215,93 @@ def test_only_check_modules_call_runner_run_and_never_with_suggestions() -> None
             if isinstance(node, ast.Call) and "runner" in ast.unparse(node.func):
                 text = ast.unparse(node)
                 assert "suggestion" not in text.lower(), (path.name, text)
+
+
+def _every_suggestion() -> list[Suggestion]:
+    built = [
+        build_check_wide(cid, ["f-1"])
+        for cid, t in CATALOG.items()
+        if t.scope == "check-wide"
+    ]
+    built.append(build_artifact_suggestion("art-1", "/p/.venv", "/p", "uv sync"))
+    built.append(build_duplicate_suggestion("dup-1", "/a", ["/b", "/c"]))
+    return built
+
+
+def test_building_suggestions_calls_no_runner_or_process(monkeypatch) -> None:
+    calls: list[object] = []
+    monkeypatch.setattr(runner, "run", lambda *a, **k: calls.append(("run", a)))
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: calls.append(("p", a)))
+    built = _every_suggestion()
+    assert {s.id.split("@")[0] for s in built} == set(CATALOG)
+    assert calls == []
+
+
+def test_no_suggestion_command_passes_the_runner_allowlist() -> None:
+    for suggestion in _every_suggestion():
+        for command in suggestion.command.split(" && "):
+            argv = shlex.split(command)
+            with pytest.raises(RejectedArgvError):
+                match_template(argv)
+        with pytest.raises(RejectedArgvError):
+            match_template(shlex.split(suggestion.command))
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("/plain/path", "'/plain/path'"),
+        ("/with space/x", "'/with space/x'"),
+        ("-leading", "'-leading'"),
+        ("it's", "'it'\\''s'"),
+        ("a\nb", "$'a\\nb'"),
+        ("a\tb", "$'a\\tb'"),
+        ("a\x1bb", "$'a\\x1bb'"),
+        ("it's\nb", "$'it\\'s\\nb'"),
+        ("a\\b\nc", "$'a\\\\b\\nc'"),
+    ],
+)
+def test_quote_operands(value: str, expected: str) -> None:
+    assert suggestions.quote(value) == expected
+
+
+def test_control_characters_never_appear_raw_in_output() -> None:
+    built = build_artifact_suggestion(
+        "art-1", "/p/a\nb/node_modules", "/p/a\tb", "npm install"
+    )
+    dup = build_duplicate_suggestion("dup-1", "/k\nx", ["/r\ty"])
+    for s in (built, dup):
+        assert not any(ord(c) < 32 for c in s.command + s.reason)
+
+
+@pytest.mark.parametrize(
+    ("artifact", "regenerate"),
+    [
+        ("/p/node_modules", "npm install"),
+        ("/p/.venv", "uv sync"),
+        ("/p/venv", "uv sync"),
+        ("/p/target", "cargo build"),
+    ],
+)
+def test_artifact_accepts_fixed_regeneration_commands(
+    artifact: str, regenerate: str
+) -> None:
+    assert build_artifact_suggestion("art-1", artifact, "/p", regenerate)
+
+
+@pytest.mark.parametrize(
+    "regenerate", ["rm -rf /", "npm install; rm x", "", "uv sync", "cargo build"]
+)
+def test_artifact_rejects_other_regeneration_commands(regenerate: str) -> None:
+    with pytest.raises(ValueError):
+        build_artifact_suggestion("art-1", "/p/node_modules", "/p", regenerate)
+
+
+def test_artifact_rejects_regeneration_that_does_not_match_kind() -> None:
+    with pytest.raises(ValueError):
+        build_artifact_suggestion("art-1", "/p/.venv", "/p", "npm install")
+
+
+def test_duplicate_rejects_kept_path_in_removal_list() -> None:
+    with pytest.raises(ValueError):
+        build_duplicate_suggestion("dup-1", "/a", ["/b", "/a"])

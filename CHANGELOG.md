@@ -36,7 +36,11 @@ All notable changes to this project are recorded here.
 ### Added
 
 - `byte-census docker scan` reports Docker-reported disk usage per type, the image inventory, dangling image count, and stopped containers; sizes are never added to host totals, and a missing CLI or stopped daemon exits 4.
-
+- Suggestion hardening: operands with control characters use `$'...'` quoting,
+  artifact suggestions accept only the fixed regeneration command for their
+  directory (`npm install`, `uv sync`, `cargo build`), duplicate suggestions
+  reject a kept path listed for removal, `FrozenMap` hashes independent of key
+  order, and `freeze` rejects NaN and infinite floats.
 - Cleanup suggestion catalog (`byte_census.suggestions`): nine immutable entries
   (docker, uv, brew, npm, artifact, duplicate) with risk, reversibility, and
   reason, pure builders for check-wide and per-finding suggestions, and the

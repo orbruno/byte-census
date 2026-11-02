@@ -5,6 +5,7 @@ catalog templates and never runs, imports a runner for, or hands a command to
 anything: no suggestion string reaches the runner (WI-SUGGESTIONS AC-04).
 """
 
+import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePosixPath
@@ -117,8 +118,37 @@ CATALOG: Mapping[str, SuggestionTemplate] = FrozenMap(
 )
 
 
+_ESCAPES = {"\\": "\\\\", "'": "\\'", "\n": "\\n", "\t": "\\t", "\r": "\\r"}
+
+# Fixed regeneration command per artifact directory name (WI-ARTIFACTS).
+REGENERATE: Mapping[str, str] = FrozenMap(
+    (
+        ("node_modules", "npm install"),
+        (".venv", "uv sync"),
+        ("venv", "uv sync"),
+        ("target", "cargo build"),
+    )
+)
+
+
+def _has_control(value: str) -> bool:
+    return any(unicodedata.category(ch) == "Cc" for ch in value)
+
+
+def _ansi_c_char(ch: str) -> str:
+    if ch in _ESCAPES:
+        return _ESCAPES[ch]
+    if unicodedata.category(ch) == "Cc":
+        return f"\\x{ord(ch):02x}"
+    return ch
+
+
 def quote(value: str) -> str:
-    """Single-quote a shell operand, as the contract examples show."""
+    """Quote a shell operand: plain single quotes, or `$'...'` ANSI-C quoting
+    when the value holds a control character, so no raw control character
+    appears in the output."""
+    if _has_control(value):
+        return "$'" + "".join(_ansi_c_char(ch) for ch in value) + "'"
     return "'" + value.replace("'", "'\\''") + "'"
 
 
@@ -160,13 +190,19 @@ def build_artifact_suggestion(
 ) -> Suggestion:
     """Remove one artifact, then regenerate it from its project directory."""
     template = _template("artifact-remove-regenerate", PER_FINDING)
+    name = PurePosixPath(artifact_path).name
+    if REGENERATE.get(name) != regenerate:
+        raise ValueError(
+            f"regenerate must be {REGENERATE.get(name)!r} for {name!r}, "
+            f"got {regenerate!r}"
+        )
     command = template.command.format(
         artifact=quote(artifact_path),
         project=quote(project_path),
         regenerate=regenerate,
     )
     reason = template.reason.format(
-        name=PurePosixPath(artifact_path).name, regenerate=regenerate
+        name=quote(name) if _has_control(name) else name, regenerate=regenerate
     )
     return _make(
         template, f"{template.id}@{finding_id}", command, reason, (finding_id,)
@@ -180,6 +216,8 @@ def build_duplicate_suggestion(
     template = _template("duplicate-remove-extra-copies", PER_FINDING)
     if not remove_paths:
         raise ValueError("a duplicate suggestion needs at least one path to remove")
+    if keep_path in remove_paths:
+        raise ValueError(f"the kept path is also listed for removal: {keep_path!r}")
     command = " && ".join(template.command.format(path=quote(p)) for p in remove_paths)
     reason = template.reason.format(keep=quote(keep_path))
     return _make(
