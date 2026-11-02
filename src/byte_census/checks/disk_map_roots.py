@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from byte_census import fsread
 from byte_census.errors import ValidationError
 from byte_census.model import ScopeRoot
 from byte_census.paths import validate_root
@@ -53,9 +54,18 @@ def identity(info: Any) -> InodeKey:
 
 
 def list_names(path: str) -> list[str]:
-    """Names in a directory, without stat calls."""
-    with os.scandir(path) as iterator:
-        return [entry.name for entry in iterator]
+    """Names in a directory, listed through fsread (never a dataless one).
+
+    Raises OSError when the directory itself cannot be listed, as the
+    callers expect; children that fail lstat still contribute their name.
+    """
+    # root_dev=-1 turns every child directory into a SkippedMount: only the
+    # names are needed here, and nothing below the listed directory is read.
+    items = fsread.list_directory(path, root_dev=-1)
+    only = items[0] if len(items) == 1 else None
+    if isinstance(only, fsread.WalkError) and only.path == path:
+        raise OSError(f"cannot list {path}: {only.reason}")
+    return [os.path.basename(item.path) for item in items]
 
 
 def ancestor_chain(path: str, lstat: Lstat) -> tuple[InodeKey, ...]:
