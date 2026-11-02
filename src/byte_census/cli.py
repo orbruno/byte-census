@@ -16,6 +16,7 @@ import click
 from byte_census import __version__
 from byte_census.checks.artifacts import artifacts
 from byte_census.checks.docker import docker
+from byte_census.checks.duplicates import duplicates
 from byte_census.errors import (
     TOOL_HELP,
     emit_error,
@@ -85,6 +86,7 @@ def main(ctx: click.Context) -> None:
 main.add_command(selftest)
 main.add_command(docker)
 main.add_command(artifacts)
+main.add_command(duplicates)
 
 
 if __name__ == "__main__":
