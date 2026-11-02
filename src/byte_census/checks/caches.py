@@ -14,6 +14,7 @@ import os
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from byte_census import fsread
 from byte_census.checks.tool_caches import (
@@ -28,7 +29,9 @@ from byte_census.checks.tree_size import (
     InodeKey,
     InodeLedger,
     TreeMeasurement,
+    UnreachableStartError,
     measure_tree,
+    measure_tree_beneath,
 )
 from byte_census.command import CheckResult
 from byte_census.cost import CostCounters
@@ -115,6 +118,7 @@ class _Children:
     """Mutable result of listing the Caches root."""
 
     folders: list[str] = field(default_factory=list)
+    listed: dict[str, Any] = field(default_factory=dict)
     coverage: list[CoverageEntry] = field(default_factory=list)
     mounts: list[str] = field(default_factory=list)
     other_entries: int = 0
@@ -134,16 +138,30 @@ def _list_children(root: str) -> _Children:
             found.other_entries += 1
         elif item.kind == "directory":
             found.folders.append(item.path)
+            found.listed[item.path] = item.stat
         else:
             found.other_entries += 1
     return found
 
 
+Beneath = tuple[str, Any]
+
+
 def _measure(
-    path: str, ledger: InodeLedger
+    path: str, ledger: InodeLedger, beneath: Beneath | None = None
 ) -> tuple[TreeMeasurement | None, CoverageEntry | None]:
+    """Measure one unit. A folder listed in the Caches root (`beneath` is the
+    root and its listing lstat) is reached again beneath that root, never by
+    its path string; other units are walk start directories."""
     try:
-        return measure_tree(path, ledger), None
+        if beneath is None:
+            return measure_tree(path, ledger), None
+        root, expected = beneath
+        return measure_tree_beneath(root, path, expected, ledger), None
+    except UnreachableStartError as refused:
+        item = refused.item
+        entry = CoverageEntry(item.path, item.reason, item.errno_name, item.operation)
+        return None, entry
     except OSError as error:
         return None, _coverage(path, error, "lstat")
 
@@ -202,8 +220,14 @@ class _Collector:
         self.mounts: list[str] = []
         self.entries = 0
 
-    def measure(self, kind: str, path: str, tools: tuple[ToolCache, ...]) -> bool:
-        measured, gap = _measure(path, self.ledger)
+    def measure(
+        self,
+        kind: str,
+        path: str,
+        tools: tuple[ToolCache, ...],
+        beneath: Beneath | None = None,
+    ) -> bool:
+        measured, gap = _measure(path, self.ledger, beneath)
         if measured is None:
             self.entries += 1
             self.coverage.append(gap)
@@ -238,7 +262,8 @@ def _gather(env: CachesEnvironment, tools: ToolResolution) -> Gathered:
     extra, units = _tool_units(tools.caches, root, listing.folders)
     hosted = _hosting(tools.caches, units)
     for path in listing.folders:
-        col.measure("cache_dir", path, hosted.get(path, ()))
+        beneath = (root, listing.listed[path]) if root else None
+        col.measure("cache_dir", path, hosted.get(path, ()), beneath)
     cache_dirs = len(col.candidates)
     for path in extra:
         col.measure_tool_unit(path, hosted.get(path, ()))

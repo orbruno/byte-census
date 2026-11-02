@@ -308,12 +308,12 @@ def test_vanished_artifact_is_reported_not_fatal(
     write(root / "q" / ".venv" / "a.py")
     real_measure = artifacts.measure_artifact
 
-    def measure(path: str, claimed: frozenset[tuple[int, int]]) -> Any:
+    def measure(path: str, claimed: frozenset[tuple[int, int]], **anchor: Any) -> Any:
         if path == str(gone):
             for child in gone.iterdir():
                 child.unlink()
             gone.rmdir()
-        return real_measure(path, claimed)
+        return real_measure(path, claimed, **anchor)
 
     monkeypatch.setattr(artifacts, "measure_artifact", measure)
 

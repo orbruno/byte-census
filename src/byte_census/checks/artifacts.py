@@ -8,6 +8,7 @@ time, and a medium-risk remove-and-regenerate suggestion. Discovery lives in
 
 from collections import Counter
 from datetime import UTC, datetime
+from typing import Any
 
 import click
 
@@ -47,20 +48,36 @@ LINKS_CAVEAT = "hard_links_merged"
 MeasuredArtifact = tuple[Artifact, Measure]
 
 
-def measure_artifact(path: str, claimed: frozenset[InodeKey]) -> Measure:
+def measure_artifact(
+    path: str, claimed: frozenset[InodeKey], *, root: str, expected: Any
+) -> Measure:
     """Size one artifact, turning a vanished or unreadable folder into coverage."""
     try:
-        return measure_subtree(path, claimed)
+        return measure_subtree(path, claimed, root=root, expected=expected)
     except OSError as error:
         return vanished(path, error)
 
 
-def _measure_all(artifacts: tuple[Artifact, ...]) -> tuple[MeasuredArtifact, ...]:
-    """Measure in byte order of path so hard-link attribution is deterministic."""
+def _discovery_lstat(artifact: Artifact) -> Any:
+    """The lstat discovery recorded for the artifact; refuse to guess it."""
+    if not isinstance(artifact.path, fsread.AnchoredPath):
+        raise TypeError(f"artifact path lost its discovery anchor: {artifact.path}")
+    return artifact.path.expected
+
+
+def _measure_all(
+    artifacts: tuple[Artifact, ...], root: str
+) -> tuple[MeasuredArtifact, ...]:
+    """Measure in byte order of path so hard-link attribution is deterministic.
+
+    Each artifact is sized beneath the check's own scan `root`, verified
+    against the lstat discovery recorded for it.
+    """
     claimed: frozenset[InodeKey] = frozenset()
     measured: list[MeasuredArtifact] = []
     for artifact in artifacts:
-        measure = measure_artifact(artifact.path, claimed)
+        expected = _discovery_lstat(artifact)
+        measure = measure_artifact(artifact.path, claimed, root=root, expected=expected)
         claimed = claimed | measure.inodes
         measured.append((artifact, measure))
     return tuple(measured)
@@ -141,7 +158,7 @@ def artifacts_check(root_argument: str) -> CheckResult:
     root = str(validate_root(root_argument))
     scope_root = ScopeRoot(root, root_argument, fsread.lstat(root).st_dev)
     found: Discovery = discover(root)
-    measured = _measure_all(found.artifacts)
+    measured = _measure_all(found.artifacts, root)
     errors = found.errors + tuple(e for _, m in measured for e in m.errors)
     mounts = found.mounts + tuple(x for _, m in measured for x in m.mounts)
     visited = found.visited + sum(m.visited for _, m in measured)

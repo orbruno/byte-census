@@ -144,6 +144,19 @@ All notable changes to this project are recorded here.
 
 ### Security
 
+- Artifact sizing fails closed: `artifacts.py` passes the scan root and the
+  discovery `lstat` to `measure_subtree`, which always walks beneath the
+  root and has no path-string fallback; an artifact that lost its discovery
+  anchor is refused. `fsread.AnchoredPath` keeps its anchor through copy,
+  deepcopy, and pickle.
+- Caches scan reaches each folder listed in the Caches root beneath that
+  root, verified against the listing `lstat`, so a Caches root swapped for a
+  symlink after listing counts nothing outside it (`changed_during_scan`).
+- Every directory opened by the walker, `list_directory`, or an openat chain
+  is rechecked for `SF_DATALESS` on its descriptor; a dataless directory is
+  never listed and no child is looked up in it.
+- An `fstat` failure inside the openat chain no longer leaks the descriptor.
+
 - Fix: after a changed ancestor ends a deep branch whose descriptors were
   evicted, the walker no longer looks up the name it had already taken from
   the dropped directory in a surviving ancestor, which could report a path

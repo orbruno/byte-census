@@ -803,3 +803,55 @@ def test_hard_link_caveat_does_not_depend_on_measurement_order(
     for name in ("aa", "zz"):
         found = finding_for(payload, world.caches / name)
         assert "hard_links_merged" in found["caveats"]
+
+
+def test_caches_root_swapped_after_listing_counts_nothing_outside(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    """Proof of concept: folders were re-walked by path after the listing."""
+    make_file(world.caches / "big" / "a.bin", 10_000)
+    outside = world.home / "outside"
+    make_file(outside / "big" / "SECRET.bin", 5_000_000)
+    real = caches._list_children
+
+    def listing_then_swap(root: str) -> Any:
+        found = real(root)
+        os.rename(world.caches, world.caches.with_name("Caches-moved"))
+        os.symlink(outside, world.caches)
+        return found
+
+    monkeypatch.setattr(caches, "_list_children", listing_then_swap)
+    result, payload = scan(monkeypatch, world)
+
+    assert result.exit_code == 0, result.stderr
+    assert str(world.caches / "big") not in by_target(payload)
+    assert all(f["allocated_bytes"] < 1_000_000 for f in payload["data"]["findings"])
+    gaps = {g["path"]: g for g in payload["meta"]["incomplete_coverage"]}
+    assert gaps[str(world.caches / "big")]["reason"] == "changed_during_scan"
+
+
+def test_cache_folder_replaced_after_listing_is_a_changed_gap(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    make_file(world.caches / "big" / "a.bin", 10_000)
+    make_file(world.caches / "keep" / "k.bin", 10_000)
+    real = caches._list_children
+
+    def listing_then_replace(root: str) -> Any:
+        found = real(root)
+        os.rename(world.caches / "big", world.caches / "big-old")
+        make_file(world.caches / "big" / "new.bin", 20_000)
+        return found
+
+    monkeypatch.setattr(caches, "_list_children", listing_then_replace)
+    _, payload = scan(monkeypatch, world)
+
+    assert str(world.caches / "keep") in by_target(payload)
+    assert str(world.caches / "big") not in by_target(payload)
+    gaps = {g["path"]: g for g in payload["meta"]["incomplete_coverage"]}
+    assert gaps[str(world.caches / "big")] == {
+        "path": str(world.caches / "big"),
+        "reason": "changed_during_scan",
+        "errno": None,
+        "operation": "scandir",
+    }

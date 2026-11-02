@@ -500,3 +500,111 @@ def test_failed_reopen_does_not_apply_a_consumed_name_to_an_ancestor(
     assert len(entries) == len(set(entries))
     errors = [i for i in items if isinstance(i, WalkError)]
     assert errors == [WalkError(str(d0), "scandir", CHANGED, None)]
+
+
+# Dataless directories are rechecked on the opened descriptor.
+
+
+class DatalessFstat:
+    """Report SF_DATALESS from fstat for one directory inode."""
+
+    def __init__(self, directory: Path) -> None:
+        self.ino = os.lstat(directory).st_ino
+        self.real = os.fstat
+
+    def __call__(self, fd: int) -> Any:
+        info = self.real(fd)
+        if info.st_ino == self.ino:
+            return fake_stat(info, st_flags=fsread.SF_DATALESS)
+        return info
+
+
+def test_directory_evicted_after_lstat_is_not_listed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "cloud").mkdir()
+    (tmp_path / "cloud" / "x").write_text("x")
+    monkeypatch.setattr(fsread.os, "fstat", DatalessFstat(tmp_path / "cloud"))
+    listed: list[str] = []
+    real = fsread._sorted_entries
+
+    def listing(path: Any) -> Any:
+        listed.append(str(path))
+        return real(path)
+
+    monkeypatch.setattr(fsread, "_sorted_entries", listing)
+
+    items = list(walk(tmp_path))
+
+    assert str(tmp_path / "cloud") not in listed
+    assert items[1] == WalkError(str(tmp_path / "cloud"), "scandir", "dataless", None)
+    assert len(items) == 2
+
+
+def test_list_directory_rechecks_dataless_on_the_descriptor(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "x").write_text("x")
+    monkeypatch.setattr(fsread.os, "fstat", DatalessFstat(tmp_path))
+
+    assert list_directory(tmp_path) == [
+        WalkError(str(tmp_path), "scandir", "dataless", None)
+    ]
+
+
+def test_open_chain_does_not_look_up_children_of_a_dataless_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "f.txt").write_text("f")
+    monkeypatch.setattr(fsread.os, "fstat", DatalessFstat(tmp_path / "a"))
+    looked_up: list[Any] = []
+    real_open = os.open
+
+    def opener(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+        looked_up.append(path)
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(fsread.os, "open", opener)
+
+    with pytest.raises(fsread.DatalessFileError):
+        fsread.hash_file_beneath(tmp_path, tmp_path / "a" / "f.txt")
+
+    assert "f.txt" not in looked_up
+
+
+def test_walk_beneath_through_a_dataless_directory_is_a_dataless_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    expected = os.lstat(tmp_path / "a" / "b")
+    monkeypatch.setattr(fsread.os, "fstat", DatalessFstat(tmp_path / "a"))
+
+    items = list(fsread.walk_beneath(tmp_path, tmp_path / "a" / "b", expected))
+
+    assert items == [WalkError(str(tmp_path / "a" / "b"), "scandir", "dataless", None)]
+
+
+def test_open_chain_closes_a_descriptor_whose_fstat_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "f.txt").write_text("f")
+    counter = FdCounter()
+    target = os.lstat(tmp_path / "a").st_ino
+    real_fstat = os.fstat
+
+    def failing(fd: int) -> Any:
+        info = real_fstat(fd)
+        if info.st_ino == target:
+            raise OSError(5, "Input/output error")
+        return info
+
+    monkeypatch.setattr(fsread.os, "open", counter.opener)
+    monkeypatch.setattr(fsread.os, "close", counter.closer)
+    monkeypatch.setattr(fsread.os, "fstat", failing)
+
+    with pytest.raises(OSError):
+        fsread.hash_file_beneath(tmp_path, tmp_path / "a" / "f.txt")
+
+    assert counter.open == set()

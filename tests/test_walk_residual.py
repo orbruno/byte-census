@@ -5,7 +5,9 @@ an outside tree at a deterministic point: after the walker has examined an
 entry and before it lists or measures that entry.
 """
 
+import copy
 import os
+import pickle
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,12 @@ from byte_census.checks import artifacts_discover, artifacts_size, disk_map_walk
 from byte_census.fsread import SkippedMount, WalkEntry, WalkError
 
 CHANGED = "changed_during_scan"
+
+
+def pickle_round_trip(value: Any) -> Any:
+    return pickle.loads(pickle.dumps(value))
+
+
 SECRET = "SECRET_OUTSIDE"
 
 
@@ -189,7 +197,9 @@ def test_poc_artifact_sizing_after_a_parent_swap_counts_nothing_outside(
     (artifact,) = artifacts_discover.discover(str(root)).artifacts
     swap_for_symlink(root / "proj", outside)
 
-    measure = artifacts_size.measure_subtree(artifact.path, frozenset())
+    measure = artifacts_size.measure_subtree(
+        artifact.path, frozenset(), root=str(root), expected=artifact.path.expected
+    )
 
     assert measure.logical_bytes == 0
     assert [(e.path, e.reason) for e in measure.errors] == [
@@ -204,12 +214,67 @@ def test_artifact_sizing_of_a_normal_tree_is_unchanged(tmp_path: Path) -> None:
     (root / "proj" / "node_modules" / "b.js").write_bytes(b"b" * 200)
     (artifact,) = artifacts_discover.discover(str(root)).artifacts
 
-    anchored = artifacts_size.measure_subtree(artifact.path, frozenset())
-    plain = artifacts_size.measure_subtree(str(artifact.path), frozenset())
+    measure = artifacts_size.measure_subtree(
+        artifact.path, frozenset(), root=str(root), expected=artifact.path.expected
+    )
 
-    assert anchored == plain
-    assert anchored.logical_bytes == 500
-    assert anchored.visited == 3
+    assert measure.logical_bytes == 500
+    assert measure.visited == 3
+    assert measure.errors == ()
+
+
+def test_stripped_anchor_still_measures_beneath_the_root(tmp_path: Path) -> None:
+    """Proof of concept: a stripped anchor used to fall back to a path walk."""
+    outside = make_outside(tmp_path)
+    root = tmp_path / "root"
+    (root / "proj" / "node_modules").mkdir(parents=True)
+    (artifact,) = artifacts_discover.discover(str(root)).artifacts
+    expected = artifact.path.expected
+    stripped = f"{artifact.path}"
+    swap_for_symlink(root / "proj", outside)
+
+    measure = artifacts_size.measure_subtree(
+        stripped, frozenset(), root=str(root), expected=expected
+    )
+
+    assert measure.logical_bytes == 0
+    assert [e.reason for e in measure.errors] == [CHANGED]
+
+
+def test_sizing_without_a_root_fails_closed(tmp_path: Path) -> None:
+    (tmp_path / "p" / ".venv").mkdir(parents=True)
+
+    with pytest.raises(TypeError):
+        artifacts_size.measure_subtree(  # type: ignore[call-arg]
+            str(tmp_path / "p" / ".venv"), frozenset()
+        )
+
+
+def test_artifact_check_refuses_an_artifact_without_its_discovery_anchor(
+    tmp_path: Path,
+) -> None:
+    from byte_census.checks import artifacts
+
+    (tmp_path / "p" / ".venv").mkdir(parents=True)
+    plain = artifacts_discover.Artifact(
+        str(tmp_path / "p" / ".venv"), ".venv", str(tmp_path / "p"), 0.0
+    )
+
+    with pytest.raises(TypeError, match="anchor"):
+        artifacts._measure_all((plain,), str(tmp_path))
+
+
+@pytest.mark.parametrize("duplicate", [copy.copy, copy.deepcopy, pickle_round_trip])
+def test_anchored_path_survives_copy_and_pickle(tmp_path: Path, duplicate: Any) -> None:
+    info = os.lstat(tmp_path)
+    anchored = fsread.AnchoredPath(str(tmp_path / "x"), str(tmp_path), info)
+
+    clone = duplicate(anchored)
+
+    assert isinstance(clone, fsread.AnchoredPath)
+    assert clone == anchored
+    assert clone.root == str(tmp_path)
+    assert (clone.expected.st_dev, clone.expected.st_ino) == (info.st_dev, info.st_ino)
 
 
 def test_artifact_path_is_an_ordinary_string_for_output(tmp_path: Path) -> None:

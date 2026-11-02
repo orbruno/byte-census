@@ -322,13 +322,17 @@ def _open_directory(
     except OSError as error:
         return None, _dir_open_error(path, error, expected)
     try:
-        same = _identity(os.fstat(fd)) == _identity(expected)
+        after = os.fstat(fd)
     except OSError as error:
         os.close(fd)
         return None, _walk_error(path, "scandir", error)
-    if not same:
+    if _identity(after) != _identity(expected):
         os.close(fd)
         return None, WalkError(str(path), "scandir", CHANGED, None)
+    if is_dataless(after):
+        # Evicted since it was listed: never list it or look up its children.
+        os.close(fd)
+        return None, WalkError(str(path), "scandir", "dataless", None)
     return fd, None
 
 
@@ -520,9 +524,9 @@ def walk_beneath(
     parts = _relative_parts(root_path, target)
     root_dev = lstat(root_path).st_dev
     try:
-        fd = _open_chain(root_path, parts, target)
-    except IdentityChangedError:
-        yield WalkError(target, "scandir", CHANGED, None)
+        fd = _open_chain(root_path, parts, target, final_dataless=True)
+    except FsReadError as refused:
+        yield WalkError(target, "scandir", refused.reason, None)
         return
     try:
         info = os.fstat(fd)
@@ -552,6 +556,10 @@ class AnchoredPath(str):
         anchored.root = root
         anchored.expected = expected
         return anchored
+
+    def __reduce__(self) -> tuple[Any, tuple[str, str, Any]]:
+        """Copy, deep-copy, and pickle with the anchor intact."""
+        return (AnchoredPath, (str(self), self.root, self.expected))
 
 
 def _list_item(path: _BoundPath, root_dev: int) -> WalkItem:
@@ -617,32 +625,69 @@ def _relative_parts(root_path: str, file_path: str) -> tuple[str, ...]:
     return parts
 
 
-def _open_chain(root_path: str, parts: tuple[str, ...], file_path: str) -> int:
-    """Open the directory holding the file by an O_NOFOLLOW chain from the root."""
+def _chain_error(error: WalkError | None, file_path: str, root_path: str) -> Exception:
+    """The exception for a scan root that could not be opened as recorded."""
+    reason = error.reason if error is not None else "read_error"
+    if reason == CHANGED:
+        return IdentityChangedError(file_path)
+    if reason == "dataless":
+        return DatalessFileError(file_path)
+    return FsReadError(file_path, f"scan root not readable ({reason}): {root_path}")
+
+
+def _open_child_dir(
+    fd: int, name: str, file_path: str, root_dev: int, allow_dataless: bool
+) -> int:
+    """Open one chain component below `fd`; closes `fd` in every case."""
+    try:
+        child = os.open(
+            name,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=fd,
+        )
+    except OSError as failure:
+        if failure.errno in _SWAP_ERRNOS:
+            raise IdentityChangedError(file_path) from failure
+        raise
+    finally:
+        os.close(fd)
+    try:
+        info = os.fstat(child)
+    except OSError:
+        os.close(child)
+        raise
+    if info.st_dev != root_dev:
+        os.close(child)
+        raise IdentityChangedError(file_path)
+    if is_dataless(info) and not allow_dataless:
+        # Never look up children of an evicted directory.
+        os.close(child)
+        raise DatalessFileError(file_path)
+    return child
+
+
+def _open_chain(
+    root_path: str, parts: tuple[str, ...], file_path: str, final_dataless: bool = False
+) -> int:
+    """Open the directory holding the file by an O_NOFOLLOW chain from the root.
+
+    Every component must be a directory on the root's device that is not
+    dataless; its children are looked up only after that check. With
+    `final_dataless`, the last component may be dataless: the caller only
+    reports it and never looks inside.
+    """
     root_info = lstat(root_path)
+    if stat.S_ISLNK(root_info.st_mode):
+        # The scan root was a directory when the scan resolved it.
+        raise IdentityChangedError(file_path)
     fd, error = _open_directory(root_path, None, root_path, root_info)
     if fd is None:
-        if error is not None and error.reason == CHANGED:
-            raise IdentityChangedError(file_path)
-        reason = error.reason if error is not None else "read_error"
-        raise FsReadError(file_path, f"scan root not readable ({reason}): {root_path}")
-    for name in parts:
-        try:
-            child = os.open(
-                name,
-                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
-                dir_fd=fd,
-            )
-        except OSError as failure:
-            os.close(fd)
-            if failure.errno in _SWAP_ERRNOS:
-                raise IdentityChangedError(file_path) from failure
-            raise
-        os.close(fd)
-        fd = child
-        if os.fstat(fd).st_dev != root_info.st_dev:
-            os.close(fd)
-            raise IdentityChangedError(file_path)
+        raise _chain_error(error, file_path, root_path)
+    for index, name in enumerate(parts):
+        last = index == len(parts) - 1
+        fd = _open_child_dir(
+            fd, name, file_path, root_info.st_dev, final_dataless and last
+        )
     return fd
 
 

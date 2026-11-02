@@ -109,3 +109,34 @@ def measure_tree(root: str, ledger: InodeLedger) -> TreeMeasurement:
     for item in fsread.walk(root):
         tally.add_item(item)
     return tally.result()
+
+
+class UnreachableStartError(Exception):
+    """The folder could not be reached as the listing recorded it."""
+
+    def __init__(self, item: fsread.WalkError) -> None:
+        super().__init__(f"{item.path}: {item.reason}")
+        self.item = item
+
+
+def measure_tree_beneath(
+    scan_root: str, path: str, expected: Any, ledger: InodeLedger
+) -> TreeMeasurement:
+    """Measure a listed folder (itself included) beneath its scan root.
+
+    The folder is reached with `fsread.walk_beneath`: an O_NOFOLLOW openat
+    chain from `scan_root`, on the scan root's device, and it must still be
+    the directory `expected` (the listing lstat) describes. Raises
+    UnreachableStartError when it was swapped or a parent is dataless, and
+    OSError when it cannot be reached at all (for example it vanished).
+    """
+    items = fsread.walk_beneath(scan_root, path, expected)
+    first = next(items, None)
+    if isinstance(first, fsread.WalkError):
+        raise UnreachableStartError(first)
+    tally = _Tally(ledger)
+    if first is not None:
+        tally.add_item(first)
+    for item in items:
+        tally.add_item(item)
+    return tally.result()

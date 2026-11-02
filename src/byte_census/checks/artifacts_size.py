@@ -9,11 +9,11 @@ already claimed, so the summary never double counts a hard link.
 
 import errno
 import stat
-from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 
 from byte_census import fsread
-from byte_census.fsread import SkippedMount, WalkEntry, WalkError, WalkItem
+from byte_census.fsread import SkippedMount, WalkEntry, WalkError
 
 InodeKey = tuple[int, int]
 BLOCK = 512
@@ -101,25 +101,20 @@ class _Tally:
         )
 
 
-def _subtree_items(path: str) -> Iterator[WalkItem]:
-    """The artifact itself, then everything below it.
+def measure_subtree(
+    path: str, claimed: frozenset[InodeKey], *, root: str, expected: Any
+) -> Measure:
+    """Size `path` beneath the scan `root`; `claimed` inodes add nothing counted.
 
-    An `fsread.AnchoredPath` from discovery is reached again beneath its scan
-    root with `fsread.walk_beneath`: no path string is followed, its identity
-    must match the discovery lstat, and the scan root's device bounds the
-    walk. A plain path string (direct callers) is walked as its own root.
+    The artifact is reached again with `fsread.walk_beneath`: an O_NOFOLLOW
+    openat chain from `root`, on the root's device, and it must still be the
+    directory `expected` (the discovery lstat) describes. There is no
+    path-string fallback: `root` and `expected` are required, so a caller
+    that lost them fails closed instead of following the path.
     """
-    if isinstance(path, fsread.AnchoredPath):
-        yield from fsread.walk_beneath(path.root, path, path.expected)
-        return
-    yield WalkEntry(path, fsread.lstat(path))
-    yield from fsread.walk(path)
-
-
-def measure_subtree(path: str, claimed: frozenset[InodeKey]) -> Measure:
-    """Size `path`; inodes in `claimed` add nothing to the counted total."""
     tally = _Tally(claimed)
-    for index, item in enumerate(_subtree_items(path)):
+    items = fsread.walk_beneath(root, str(path), expected)
+    for index, item in enumerate(items):
         if isinstance(item, WalkEntry):
             tally.add_entry(item, is_top=index == 0)
         else:
