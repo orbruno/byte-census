@@ -4,6 +4,14 @@ All notable changes to this project are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Snapshot test helper (`tests/support/snapshots.py`) that normalizes
+  `captured_at`, `cost`, `scope.st_dev`, and fixture roots; snapshots update
+  only with `BYTE_CENSUS_UPDATE_SNAPSHOTS=1`.
+- Coverage gate: `uv run pytest` fails below 80 percent line coverage.
+- GitHub Actions workflow running ruff and the full suite on `macos-latest`.
+
 ## 2.0.0
 
 ### Changed

@@ -33,3 +33,8 @@ dev = [
 
 [tool.ruff]
 extend-exclude = ["docs/benchmarks"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--cov=byte_census --cov-report=term-missing --cov-fail-under=80"
