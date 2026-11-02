@@ -425,7 +425,11 @@ def test_unparseable_numbers_are_null_raw_kept_and_totals_unknown(
     details = payload["data"]["findings"][0]["details"]
     assert details["total_count"] is None
     assert details["docker_reported_size_bytes"] is None
-    assert details["raw"] == {"Size": "?", "Reclaimable": "?"}
+    assert details["raw"] == {
+        "Size": "?",
+        "Reclaimable": "?",
+        "TotalCount": "x",
+    }
     summary = payload["data"]["summary"]
     assert summary["docker_reported_size_bytes"] is None
     assert summary["docker_reported_reclaimable_bytes"] is None
@@ -553,6 +557,59 @@ def test_invalid_date_marks_the_source_partial(
     assert container["created_at"] == "2026-13-45 99:99:99 +0000 UTC"
     assert payload["meta"]["status"] == "partial"
     assert payload["meta"]["unavailable_sources"][0]["source"].startswith("docker ps")
+
+
+def df_row(**fields: str) -> str:
+    base = {"Type": "Images", "TotalCount": "1", "Size": "1MB", "Reclaimable": "0B"}
+    return json.dumps({**base, **fields})
+
+
+@pytest.mark.parametrize("blank", ["", "   "], ids=["empty", "spaces"])
+def test_blank_type_row_is_dropped_and_partial(
+    monkeypatch: pytest.MonkeyPatch, blank: str
+) -> None:
+    table = responses(df=ok(DF, [*df_lines(), df_row(Type=blank)]))
+
+    payload = json.loads(invoke(monkeypatch, table).output)
+
+    assert len(payload["data"]["findings"]) == 4
+    assert payload["meta"]["status"] == "partial"
+    assert "empty Type" in payload["meta"]["unavailable_sources"][0]["detail"]
+
+
+def test_only_blank_type_rows_exit_4(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = invoke(monkeypatch, responses(df=ok(DF, [df_row(Type=" ")])))
+
+    assert result.exit_code == 4
+    assert "unusable" in error_object(result)["reason"]
+
+
+@pytest.mark.parametrize("raw", ["-1", "x", "1.5", ""])
+@pytest.mark.parametrize("field", ["TotalCount", "Active"])
+def test_bad_counts_are_null_raw_kept_and_partial(
+    monkeypatch: pytest.MonkeyPatch, field: str, raw: str
+) -> None:
+    others = [line for line in df_lines() if '"Images"' not in line]
+    row = df_row(**{field: raw, "Active": raw if field == "Active" else "1"})
+    payload = json.loads(
+        invoke(monkeypatch, responses(df=ok(DF, [row, *others]))).output
+    )
+
+    details = payload["data"]["findings"][0]["details"]
+    key = "total_count" if field == "TotalCount" else "active_count"
+    assert details[key] is None
+    assert details["raw"][field] == raw
+    assert payload["meta"]["status"] == "partial"
+    assert field in payload["meta"]["unavailable_sources"][0]["detail"]
+
+
+def test_zero_counts_are_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+    row = df_row(TotalCount="0", Active="0")
+
+    payload = json.loads(invoke(monkeypatch, responses(df=ok(DF, [row]))).output)
+
+    assert payload["data"]["findings"][0]["details"]["total_count"] == 0
+    assert payload["meta"]["status"] == "complete"
 
 
 @pytest.mark.parametrize("flag", ["-h", "--help"])

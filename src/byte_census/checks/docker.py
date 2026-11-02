@@ -63,6 +63,7 @@ CATALOG_ORDER = (
     "docker-volume-prune",
 )
 SHORT_ID = 12
+MAX_COUNT_DIGITS = 18
 IMAGE_ID = re.compile(r"^(sha256:)?[0-9a-f]{12,64}$")
 DF_REQUIRED = ("Type", "TotalCount", "Size", "Reclaimable")
 IMAGE_REQUIRED = ("Repository", "Tag", "ID", "Size")
@@ -160,9 +161,11 @@ def _split_rows(
     valid, notes = [], []
     for row in rows:
         missing = [k for k in required if not isinstance(row.get(k), str)]
+        name = row.get(label) if isinstance(row.get(label), str) else "?"
         if missing:
-            name = row.get(label) if isinstance(row.get(label), str) else "?"
             notes.append(f"row {name} lacks {', '.join(missing)}")
+        elif label == "Type" and not name.strip():
+            notes.append("row with an empty Type was dropped")
         else:
             valid.append(row)
     return tuple(valid), "; ".join(notes)
@@ -218,10 +221,11 @@ def _plain_rows(text: str) -> tuple[str, ...]:
 
 
 def _int_or_none(raw: Any) -> int | None:
-    try:
-        return int(str(raw))
-    except ValueError:
+    """A non-negative integer from plain ASCII digits, else null."""
+    text = str(raw).strip()
+    if not (text.isascii() and text.isdigit()) or len(text) > MAX_COUNT_DIGITS:
         return None
+    return int(text)
 
 
 def _unparsed(row: dict[str, Any], details: Mapping[str, Any]) -> list[str]:
@@ -237,6 +241,15 @@ def _unparsed(row: dict[str, Any], details: Mapping[str, Any]) -> list[str]:
         for raw, key in fields.items()
         if details[key] is None and (raw != "Active" or "Active" in row)
     ]
+
+
+def _raw_counts(row: dict[str, Any]) -> dict[str, str]:
+    """Raw count strings, kept only when they are not non-negative integers."""
+    return {
+        key: str(row[key])
+        for key in ("TotalCount", "Active")
+        if key in row and _int_or_none(row[key]) is None
+    }
 
 
 def _type_finding(row: dict[str, Any]) -> Finding:
@@ -256,7 +269,7 @@ def _type_finding(row: dict[str, Any]) -> Finding:
             "active_count": _int_or_none(row.get("Active")),
             "docker_reported_size_bytes": parse_docker_size(size),
             "docker_reported_reclaimable_bytes": parse_reclaimable(reclaim),
-            "raw": {"Size": size, "Reclaimable": reclaim},
+            "raw": {"Size": size, "Reclaimable": reclaim, **_raw_counts(row)},
         },
     )
 

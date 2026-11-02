@@ -15,6 +15,7 @@ All notable changes to this project are recorded here.
 
 ### Added
 
+- `byte-census docker scan` drops `docker system df` rows with a blank Type, and reports negative or non-integer TotalCount and Active as null with the raw value kept and a partial status.
 - `byte-census disk map` reports a depth-limited folder tree per scan root
   (`--tree-depth`, default 4; `--tree-min-mb`, default 100) from the same walk.
 - `byte-census disk map` also measures the ten macOS categories and the uv,
