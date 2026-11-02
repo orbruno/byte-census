@@ -9,10 +9,11 @@ already claimed, so the summary never double counts a hard link.
 
 import errno
 import stat
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from byte_census import fsread
-from byte_census.fsread import SkippedMount, WalkEntry, WalkError
+from byte_census.fsread import SkippedMount, WalkEntry, WalkError, WalkItem
 
 InodeKey = tuple[int, int]
 BLOCK = 512
@@ -100,13 +101,27 @@ class _Tally:
         )
 
 
+def _subtree_items(path: str) -> Iterator[WalkItem]:
+    """The artifact itself, then everything below it.
+
+    An `fsread.AnchoredPath` from discovery is reached again beneath its scan
+    root with `fsread.walk_beneath`: no path string is followed, its identity
+    must match the discovery lstat, and the scan root's device bounds the
+    walk. A plain path string (direct callers) is walked as its own root.
+    """
+    if isinstance(path, fsread.AnchoredPath):
+        yield from fsread.walk_beneath(path.root, path, path.expected)
+        return
+    yield WalkEntry(path, fsread.lstat(path))
+    yield from fsread.walk(path)
+
+
 def measure_subtree(path: str, claimed: frozenset[InodeKey]) -> Measure:
     """Size `path`; inodes in `claimed` add nothing to the counted total."""
     tally = _Tally(claimed)
-    tally.add_entry(WalkEntry(path, fsread.lstat(path)), is_top=True)
-    for item in fsread.walk(path):
+    for index, item in enumerate(_subtree_items(path)):
         if isinstance(item, WalkEntry):
-            tally.add_entry(item, is_top=False)
+            tally.add_entry(item, is_top=index == 0)
         else:
             tally.add_other(item)
     return tally.freeze()

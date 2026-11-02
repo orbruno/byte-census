@@ -189,20 +189,45 @@ class ScopeWalk:
 def walk_pruned(
     root: str, root_dev: int, prune: Callable[[fsread.WalkEntry], bool]
 ) -> Iterator[fsread.WalkItem]:
-    """Depth-first walk in byte order of names; pruned directories vanish."""
-    stack = [iter(fsread.list_directory(root, root_dev))]
-    while stack:
-        item = next(stack[-1], None)
-        if item is None:
-            stack.pop()
-            continue
-        if isinstance(item, fsread.WalkEntry) and item.kind == "directory":
-            if prune(item):
-                continue
+    """Depth-first walk in byte order of names; pruned directories vanish.
+
+    The walk is fsread's descriptor-relative walk, so no directory below the
+    root is reached through its path string. `root_dev` is the root's own
+    device, which the walk records itself. A root that is not a directory
+    gives the single error `list_directory` reports for it.
+    """
+    pruned: set[str] = set()
+
+    def skip(entry: fsread.WalkEntry) -> bool:
+        if prune(entry):
+            pruned.add(entry.path)
+            return True
+        return False
+
+    items = fsread.walk(root, prune=skip)
+    try:
+        first = next(items)
+    except StopIteration:
+        return
+    except NotADirectoryError:
+        yield from fsread.list_directory(root, root_dev)
+        return
+    yield from _unpruned(first, items, pruned)
+
+
+def _unpruned(
+    first: fsread.WalkItem, rest: Iterator[fsread.WalkItem], pruned: set[str]
+) -> Iterator[fsread.WalkItem]:
+    """Drop the entries of pruned directories; everything else passes."""
+    if not _is_pruned(first, pruned):
+        yield first
+    for item in rest:
+        if not _is_pruned(item, pruned):
             yield item
-            stack.append(iter(fsread.list_directory(item.path, root_dev)))
-            continue
-        yield item
+
+
+def _is_pruned(item: fsread.WalkItem, pruned: set[str]) -> bool:
+    return isinstance(item, fsread.WalkEntry) and item.path in pruned
 
 
 class _WalkTally:

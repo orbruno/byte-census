@@ -1,17 +1,20 @@
 """Discovery of regenerable development artifacts (WI-ARTIFACTS AC-01, AC-02).
 
-Discovery lists directories with sorted names, never follows a symlink,
-never crosses `st_dev`, and does not descend into a found artifact, `.git`,
-`Library`, or `.Trash`. `target` counts only beside a `Cargo.toml`.
+Discovery is one pruned `fsread.walk`: directories are listed in byte order
+of names through descriptors, never by following a path string, symlinks are
+never followed, `st_dev` is never crossed, and the walk does not descend into
+a found artifact, `.git`, `Library`, or `.Trash`. `target` counts only beside
+a `Cargo.toml` (which sorts before `target`, so it is always seen first).
+Each artifact path is an `fsread.AnchoredPath`, so sizing can reach it again
+beneath the scan root.
 """
 
 import os
-from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
 from byte_census import fsread
-from byte_census.fsread import SkippedMount, WalkError
+from byte_census.fsread import SkippedMount, WalkEntry, WalkError, WalkItem
 
 REGENERATE: dict[str, str] = {
     "node_modules": "npm install",
@@ -34,17 +37,6 @@ class Artifact:
 
 
 @dataclass(frozen=True)
-class DirScan:
-    """What one directory listing yielded."""
-
-    artifacts: tuple[Artifact, ...] = ()
-    subdirs: tuple[tuple[str, Any], ...] = ()
-    errors: tuple[WalkError, ...] = ()
-    mounts: tuple[SkippedMount, ...] = ()
-    visited: int = 0
-
-
-@dataclass(frozen=True)
 class Discovery:
     """The whole discovery pass, with artifacts in byte order of path."""
 
@@ -54,41 +46,57 @@ class Discovery:
     visited: int
 
 
-def _has_manifest(children: list[fsread.WalkEntry]) -> bool:
-    return any(
-        os.path.basename(child.path) == CARGO_MANIFEST and child.kind == "file"
-        for child in children
-    )
-
-
 def _is_artifact(name: str, has_manifest: bool) -> bool:
     if name == "target":
         return has_manifest
     return name in REGENERATE
 
 
-def scan_directory(path: str, info: Any, root_dev: int) -> DirScan:
-    """List one directory and sort its children into artifacts and subdirs."""
-    items = fsread.list_directory(path, root_dev)
-    children = [i for i in items if isinstance(i, fsread.WalkEntry)]
-    has_manifest = _has_manifest(children)
-    artifacts: list[Artifact] = []
-    subdirs: list[tuple[str, Any]] = []
-    for child in children:
-        name = os.path.basename(child.path)
-        if child.kind != "directory":
-            continue
-        if _is_artifact(name, has_manifest):
-            artifacts.append(Artifact(child.path, name, path, info.st_mtime))
-        elif name not in EXCLUDED:
-            subdirs.append((child.path, child.stat))
-    return DirScan(
-        artifacts=tuple(artifacts),
-        subdirs=tuple(subdirs),
-        errors=tuple(i for i in items if isinstance(i, WalkError)),
-        mounts=tuple(i for i in items if isinstance(i, SkippedMount)),
-        visited=sum(1 for i in items if i.path != path),
-    )
+class _Discoverer:
+    """Private accumulator for one discovery walk; `result` freezes it."""
+
+    def __init__(self, root: str, root_info: Any) -> None:
+        self.root = root
+        self.mtimes: dict[str, float] = {root: root_info.st_mtime}
+        self.manifests: set[str] = set()
+        self.artifacts: list[Artifact] = []
+        self.errors: list[WalkError] = []
+        self.mounts: list[SkippedMount] = []
+        self.visited = 0
+
+    def prune(self, entry: WalkEntry) -> bool:
+        """Record artifacts; do not descend into them or excluded folders."""
+        project, name = os.path.split(entry.path)
+        if _is_artifact(name, project in self.manifests):
+            path = fsread.AnchoredPath(entry.path, self.root, entry.stat)
+            mtime = self.mtimes[project]
+            self.artifacts.append(Artifact(path, name, project, mtime))
+            return True
+        if name in EXCLUDED:
+            return True
+        self.mtimes[entry.path] = entry.stat.st_mtime
+        return False
+
+    def add(self, item: WalkItem) -> None:
+        if isinstance(item, WalkEntry):
+            self.visited += 1
+            parent, name = os.path.split(item.path)
+            if name == CARGO_MANIFEST and item.kind == "file":
+                self.manifests.add(parent)
+        elif isinstance(item, SkippedMount):
+            self.mounts.append(item)
+            self.visited += 1
+        else:
+            self.errors.append(item)
+            self.visited += 1 if item.operation == "lstat" else 0
+
+    def result(self) -> Discovery:
+        return Discovery(
+            artifacts=tuple(sorted(self.artifacts, key=_byte_order)),
+            errors=tuple(self.errors),
+            mounts=tuple(self.mounts),
+            visited=self.visited,
+        )
 
 
 def _byte_order(artifact: Artifact) -> bytes:
@@ -97,22 +105,7 @@ def _byte_order(artifact: Artifact) -> bytes:
 
 def discover(root: str) -> Discovery:
     """Find artifacts below `root` (a resolved directory), pruned as described."""
-    root_info = fsread.lstat(root)
-    stack: list[tuple[str, Any]] = [(root, root_info)]
-    scans = list(_drain(stack, root_info.st_dev))
-    return Discovery(
-        artifacts=tuple(
-            sorted((a for s in scans for a in s.artifacts), key=_byte_order)
-        ),
-        errors=tuple(e for s in scans for e in s.errors),
-        mounts=tuple(m for s in scans for m in s.mounts),
-        visited=sum(s.visited for s in scans),
-    )
-
-
-def _drain(stack: list[tuple[str, Any]], root_dev: int) -> Iterator[DirScan]:
-    while stack:
-        path, info = stack.pop()
-        scan = scan_directory(path, info, root_dev)
-        yield scan
-        stack.extend(reversed(scan.subdirs))
+    found = _Discoverer(root, fsread.lstat(root))
+    for item in fsread.walk(root, prune=found.prune):
+        found.add(item)
+    return found.result()

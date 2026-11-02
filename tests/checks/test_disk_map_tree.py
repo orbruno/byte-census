@@ -182,6 +182,14 @@ def test_mounts_are_not_tree_nodes(
         return OtherDevice(info) if os.fspath(path) == str(mounted) else info
 
     monkeypatch.setattr(fsread, "lstat", fake)
+    real_entry = fsread._entry_lstat
+
+    def fake_entry(entry: Any) -> Any:
+        info = real_entry(entry)
+        return OtherDevice(info) if entry.path == str(mounted) else info
+
+    # The walker examines children relative to their parent descriptor.
+    monkeypatch.setattr(fsread, "_entry_lstat", fake_entry)
     _, payload = run_map(monkeypatch, world, [root], "--tree-min-mb", "0")
 
     assert "mid" not in relative_paths(tree_of(payload)["roots"][0], root)

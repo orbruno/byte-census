@@ -141,6 +141,17 @@ All notable changes to this project are recorded here.
 
 ### Security
 
+- `fsread.walk` accepts `prune`, and the new `fsread.walk_beneath` reaches a
+  directory below a scan root through an `O_NOFOLLOW` openat chain, checks
+  its identity, and walks it on the scan root's device. Disk map's pruned
+  walk and artifacts discovery now use the pruning descriptor walk instead of
+  re-listing each directory by its path string, and artifact sizing walks
+  each artifact beneath its scan root, verified against the discovery
+  `lstat`. A directory swapped for a symlink after discovery is reported as
+  `changed_during_scan` and contributes no bytes.
+- A failing `fstat` after opening a file beneath a root no longer leaks the
+  descriptor.
+
 - `fsread.walk` and `fsread.list_directory` open every directory with
   `O_RDONLY | O_DIRECTORY | O_NOFOLLOW` relative to its parent's
   descriptor, confirm its identity with `fstat`, list it with `scandir` on

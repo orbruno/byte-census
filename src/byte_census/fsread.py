@@ -10,7 +10,7 @@ import errno
 import hashlib
 import os
 import stat
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from typing import Any, Self
@@ -340,8 +340,11 @@ def _list_names(path: str, fd: int) -> tuple[list[str], WalkError | None]:
     return [entry.name for entry in entries], None
 
 
+Prune = Callable[[WalkEntry], bool] | None
+
+
 def _step(
-    frame: _Frame, name: str, root_dev: int
+    frame: _Frame, name: str, root_dev: int, prune: Prune
 ) -> tuple[list[WalkItem], _Frame | None]:
     """Classify one child of `frame`; for a local directory, open and list it."""
     path = os.path.join(frame.path, name)
@@ -353,6 +356,8 @@ def _step(
         return [SkippedMount(path)], None
     item = WalkEntry(path, info)
     if not stat.S_ISDIR(info.st_mode):
+        return [item], None
+    if prune is not None and prune(item):
         return [item], None
     if is_dataless(info):
         return [item, WalkError(path, "scandir", "dataless", None)], None
@@ -415,7 +420,9 @@ def _ensure_top_open(stack: list[_Frame], root_fd: int) -> list[WalkItem]:
     return []
 
 
-def _drain(stack: list[_Frame], root_fd: int, root_dev: int) -> Iterator[WalkItem]:
+def _drain(
+    stack: list[_Frame], root_fd: int, root_dev: int, prune: Prune
+) -> Iterator[WalkItem]:
     while stack:
         name = next(stack[-1].names, None)
         if name is None:
@@ -427,7 +434,7 @@ def _drain(stack: list[_Frame], root_fd: int, root_dev: int) -> Iterator[WalkIte
             yield from _ensure_top_open(stack, root_fd)
             if stack[-1].fd is None:
                 continue
-        items, child = _step(stack[-1], name, root_dev)
+        items, child = _step(stack[-1], name, root_dev, prune)
         if child is not None:
             # Push before yielding, so closing the generator releases it.
             stack.append(child)
@@ -435,7 +442,29 @@ def _drain(stack: list[_Frame], root_fd: int, root_dev: int) -> Iterator[WalkIte
         yield from items
 
 
-def walk(root: StrPath) -> Iterator[WalkItem]:
+def _walk_open(
+    path: str, fd: int, info: Any, root_dev: int, prune: Prune, include_start: bool
+) -> Iterator[WalkItem]:
+    """Walk below an already opened and verified directory; owns `fd`."""
+    stack: list[_Frame] = []
+    try:
+        if include_start:
+            yield WalkEntry(path, info)
+        if is_dataless(info):
+            yield WalkError(path, "scandir", "dataless", None)
+            return
+        names, error = _list_names(path, fd)
+        if error is not None:
+            yield error
+            return
+        stack.append(_Frame(path, (), info, iter(names), fd))
+        yield from _drain(stack, fd, root_dev, prune)
+    finally:
+        _close_frames(stack[1:])
+        os.close(fd)
+
+
+def walk(root: StrPath, prune: Prune = None) -> Iterator[WalkItem]:
     """Walk root depth-first in byte order of names, never following symlinks.
 
     Every directory is opened with O_RDONLY | O_DIRECTORY | O_NOFOLLOW
@@ -449,6 +478,10 @@ def walk(root: StrPath) -> Iterator[WalkItem]:
     counted or entered. A dataless directory is yielded, then reported as a
     WalkError with reason `dataless`, and never listed. The root itself is
     not yielded. Yielded paths are the root string joined with entry names.
+
+    `prune`, when given, is called with each same-device directory entry
+    before it is entered; returning True yields the entry but does not
+    descend into it.
     """
     root_path = os.fspath(root)
     info = lstat(root_path)
@@ -463,17 +496,59 @@ def walk(root: StrPath) -> Iterator[WalkItem]:
     if root_fd is None:
         yield from [error] if error is not None else []
         return
-    stack: list[_Frame] = []
+    yield from _walk_open(root_path, root_fd, info, info.st_dev, prune, False)
+
+
+def walk_beneath(
+    root: StrPath, path: StrPath, expected: Any, prune: Prune = None
+) -> Iterator[WalkItem]:
+    """Walk a directory below a scan root, reached without following symlinks.
+
+    `path` is reached by an O_NOFOLLOW openat chain from `root`, every
+    component on the root's device, and must match `expected` (an lstat
+    result recorded earlier, for example by discovery) by (st_dev, st_ino).
+    Unlike `walk`, the start directory itself is yielded first, with its
+    `fstat` result. A swapped or mismatched start is a single WalkError with
+    reason `changed_during_scan`. The walk then proceeds as `walk` does,
+    using the root's st_dev. Raises OSError when `path` cannot be reached for
+    another reason (for example it vanished).
+    """
+    root_path, target = os.fspath(root), os.fspath(path)
+    parts = _relative_parts(root_path, target)
+    root_dev = lstat(root_path).st_dev
     try:
-        names, error = _list_names(root_path, root_fd)
-        if error is not None:
-            yield error
-            return
-        stack.append(_Frame(root_path, (), info, iter(names), root_fd))
-        yield from _drain(stack, root_fd, info.st_dev)
-    finally:
-        _close_frames(stack[1:])
-        os.close(root_fd)
+        fd = _open_chain(root_path, parts, target)
+    except IdentityChangedError:
+        yield WalkError(target, "scandir", CHANGED, None)
+        return
+    try:
+        info = os.fstat(fd)
+    except OSError:
+        os.close(fd)
+        raise
+    if _identity(info) != _identity(expected):
+        os.close(fd)
+        yield WalkError(target, "scandir", CHANGED, None)
+        return
+    yield from _walk_open(target, fd, info, root_dev, prune, True)
+
+
+class AnchoredPath(str):
+    """A path string that remembers the scan root and lstat it was found with.
+
+    It compares, hashes, prints, and serializes exactly as the plain path, so
+    outputs do not change, while consumers such as artifact sizing can reach
+    it again with `walk_beneath` instead of following the path string.
+    """
+
+    root: str
+    expected: Any
+
+    def __new__(cls, path: str, root: str, expected: Any) -> Self:
+        anchored = super().__new__(cls, path)
+        anchored.root = root
+        anchored.expected = expected
+        return anchored
 
 
 def _list_item(path: _BoundPath, root_dev: int) -> WalkItem:
@@ -582,7 +657,11 @@ def _open_file_at(parent: int, name: str, file_path: str, expected: Any) -> int:
         if failure.errno in _SWAP_ERRNOS:
             raise IdentityChangedError(file_path) from failure
         raise
-    after = os.fstat(fd)
+    try:
+        after = os.fstat(fd)
+    except OSError:
+        os.close(fd)
+        raise
     if (
         _identity(after) != _identity(before)
         or not stat.S_ISREG(after.st_mode)

@@ -226,6 +226,14 @@ def test_descent_never_crosses_a_device_change(
         return OtherDevice(info) if os.fspath(path) == str(mounted) else info
 
     monkeypatch.setattr(fsread, "lstat", fake)
+    real_entry = fsread._entry_lstat
+
+    def fake_entry(entry: Any) -> Any:
+        info = real_entry(entry)
+        return OtherDevice(info) if entry.path == str(mounted) else info
+
+    # The walker examines children relative to their parent descriptor.
+    monkeypatch.setattr(fsread, "_entry_lstat", fake_entry)
     _, payload = run_map(monkeypatch, world, [docs])
 
     assert payload["meta"]["scope"]["skipped_mounts"] == [str(mounted)]
