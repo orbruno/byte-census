@@ -41,12 +41,32 @@ def write_report(output: Path, text: str | None) -> None:
             raise ExistingOutputError(output) from error
         raise _cannot_write(output, error) from error
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(text or "")
-    except OSError as error:
+        _write_text(descriptor, text or "")
+    except Exception as error:
+        _remove_created_file(output, descriptor)
         raise _cannot_write(output, error) from error
+    finally:
+        os.close(descriptor)
     status_console.print(f"✓ Results saved to {output}", style="green", markup=False)
 
 
-def _cannot_write(output: Path, error: OSError) -> click.ClickException:
+def _write_text(descriptor: int, text: str) -> None:
+    """Write text as UTF-8, keeping undecodable path bytes (surrogateescape)."""
+    data = memoryview(text.encode("utf-8", errors="surrogateescape"))
+    while data:
+        data = data[os.write(descriptor, data) :]
+
+
+def _remove_created_file(output: Path, descriptor: int) -> None:
+    """Unlink output only if it is still the file this writer created."""
+    try:
+        created = os.fstat(descriptor)
+        current = os.lstat(output)
+        if (created.st_dev, created.st_ino) == (current.st_dev, current.st_ino):
+            os.unlink(output)
+    except OSError:
+        pass
+
+
+def _cannot_write(output: Path, error: Exception) -> click.ClickException:
     return click.ClickException(f"Cannot write output file {output}: {error}")

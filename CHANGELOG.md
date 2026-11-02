@@ -4,6 +4,16 @@ All notable changes to this project are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- `dupfind` hashes through the safe reader: dataless (evicted) files are not
+  downloaded, FIFOs and other special files do not hang the scan, and a file
+  swapped for a symlink is not followed. Each becomes a per-file warning on
+  stderr and the run still exits 0. Output for regular files is unchanged.
+- `dupfind --output` writes undecodable path bytes faithfully, and a failed write
+  removes the file it created (only if it is still the same inode) and exits 1
+  with "Cannot write output file" instead of a traceback.
+
 ### Changed
 
 - `dupfind --output FILE` now creates the file exclusively. An existing file or
