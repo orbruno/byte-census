@@ -129,6 +129,19 @@ All notable changes to this project are recorded here.
 
 ### Security
 
+- `fsread.walk` and `fsread.list_directory` open every directory with
+  `O_RDONLY | O_DIRECTORY | O_NOFOLLOW` relative to its parent's
+  descriptor, confirm its identity with `fstat`, list it with `scandir` on
+  the descriptor, and examine children with `fstatat`. A directory or parent
+  swapped for a symlink during a scan is reported as `changed_during_scan`
+  instead of redirecting the walk outside the root. At most 16 directory
+  descriptors stay open; deeper ancestors are reopened by an `O_NOFOLLOW`
+  chain from the root. Entries on another device, including regular files,
+  are skipped mounts and never counted.
+- New `fsread.open_regular_file_beneath` and `fsread.hash_file_beneath` open
+  a file through an `O_NOFOLLOW` chain from its scan root, with an optional
+  identity check against the walk's `lstat`.
+
 - The runner pins `df`, `diskutil`, and `tmutil` to absolute system paths,
   rejects relative `PATH` lookups for docker, uv, and brew, runs every
   child with `cwd="/"` in its own session, kills the whole process group on
