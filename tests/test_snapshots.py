@@ -117,3 +117,68 @@ def test_allocated_bytes_of_does_not_follow_symlinks(tmp_path: Path) -> None:
     link.symlink_to(target)
 
     assert allocated_bytes_of(link) == os.lstat(link).st_blocks * 512
+
+
+def test_normalize_masks_st_dev_of_every_scope_root() -> None:
+    data = {
+        "meta": {
+            "scope": {
+                "roots": [
+                    {"path": "/a", "given": "a", "st_dev": 1},
+                    {"path": "/b", "given": "b", "st_dev": 2},
+                ]
+            }
+        }
+    }
+
+    result = normalize(data)
+
+    assert [root["st_dev"] for root in result["meta"]["scope"]["roots"]] == [
+        "<ST_DEV>",
+        "<ST_DEV>",
+    ]
+    assert data["meta"]["scope"]["roots"][0]["st_dev"] == 1
+
+
+def test_normalize_replaces_ids_consistently_across_references() -> None:
+    data = {
+        "data": {
+            "findings": [
+                {"id": "art-0123456789ab", "suggestion_ids": ["rm@art-0123456789ab"]},
+                {"id": "art-ba9876543210", "suggestion_ids": []},
+            ],
+            "suggestions": [
+                {
+                    "id": "rm@art-0123456789ab",
+                    "finding_ids": ["art-0123456789ab", "art-ba9876543210"],
+                },
+                {"id": "docker-image-prune", "finding_ids": []},
+            ],
+            "reconciliation": {
+                "contributions": [{"finding_id": "art-ba9876543210"}],
+            },
+            "other": "art-0123456789ab",
+        }
+    }
+
+    result = normalize(data)["data"]
+
+    assert result["findings"][0] == {
+        "id": "art-<ID1>",
+        "suggestion_ids": ["rm@art-<ID1>"],
+    }
+    assert result["findings"][1]["id"] == "art-<ID2>"
+    assert result["suggestions"][0] == {
+        "id": "rm@art-<ID1>",
+        "finding_ids": ["art-<ID1>", "art-<ID2>"],
+    }
+    assert result["suggestions"][1]["id"] == "docker-image-prune"
+    assert result["reconciliation"]["contributions"][0]["finding_id"] == "art-<ID2>"
+    assert result["other"] == "art-0123456789ab"
+
+
+def test_normalized_ids_do_not_depend_on_the_hash() -> None:
+    first = {"findings": [{"id": "map-aaaaaaaaaaaa"}]}
+    second = {"findings": [{"id": "map-bbbbbbbbbbbb"}]}
+
+    assert normalize(first) == normalize(second)

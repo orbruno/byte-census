@@ -1,8 +1,17 @@
-"""JSON snapshot helper with normalization of volatile fields."""
+"""JSON snapshot helper with normalization of volatile fields.
+
+Normalized: `meta.captured_at`, `meta.cost`, `meta.scope.st_dev`, every
+`meta.scope.roots[].st_dev`, fixture root prefixes in strings, and the
+path-derived IDs in `id`, `finding_id`, `finding_ids`, and `suggestion_ids`.
+An ID `<prefix>-<12 hex>` becomes `<prefix>-<IDn>`, numbered by first
+appearance, so cross-references stay checkable while hashes of machine paths
+drop out. A suggestion ID `<catalog>@<finding-id>` keeps its catalog part.
+"""
 
 import copy
 import json
 import os
+import re
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -10,6 +19,9 @@ from typing import Any
 SNAPSHOT_DIR = Path(__file__).resolve().parent.parent / "snapshots"
 UPDATE_ENV = "BYTE_CENSUS_UPDATE_SNAPSHOTS"
 ROOT_TOKEN = "<ROOT>"
+ST_DEV_TOKEN = "<ST_DEV>"
+ID_FIELDS = frozenset({"id", "finding_id", "finding_ids", "suggestion_ids"})
+FINDING_ID = re.compile(r"\b([a-z]{3})-([0-9a-f]{12})\b")
 
 
 def allocated_bytes_of(path: str | os.PathLike[str]) -> int:
@@ -39,8 +51,41 @@ def _mask_meta(data: dict[str, Any]) -> None:
     if "cost" in meta:
         meta["cost"] = "<COST>"
     scope = meta.get("scope")
-    if isinstance(scope, dict) and "st_dev" in scope:
-        scope["st_dev"] = "<ST_DEV>"
+    if not isinstance(scope, dict):
+        return
+    if "st_dev" in scope:
+        scope["st_dev"] = ST_DEV_TOKEN
+    for root in scope.get("roots") or []:
+        if isinstance(root, dict) and "st_dev" in root:
+            root["st_dev"] = ST_DEV_TOKEN
+
+
+class _IdNumbering:
+    """Assigns `<IDn>` to each distinct ID hash in order of first appearance."""
+
+    def __init__(self) -> None:
+        self.numbers: dict[str, int] = {}
+
+    def token(self, match: re.Match[str]) -> str:
+        number = self.numbers.setdefault(match.group(0), len(self.numbers) + 1)
+        return f"{match.group(1)}-<ID{number}>"
+
+    def replace(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return FINDING_ID.sub(self.token, value)
+        if isinstance(value, list):
+            return [self.replace(item) for item in value]
+        return value
+
+    def walk(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: self.replace(item) if key in ID_FIELDS else self.walk(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [self.walk(item) for item in value]
+        return value
 
 
 def normalize(data: Any, roots: Iterable[str | os.PathLike[str]] = ()) -> Any:
@@ -49,7 +94,7 @@ def normalize(data: Any, roots: Iterable[str | os.PathLike[str]] = ()) -> Any:
     if isinstance(result, dict):
         _mask_meta(result)
     ordered = sorted((str(root) for root in roots), key=len, reverse=True)
-    return _replace_roots(result, tuple(ordered))
+    return _IdNumbering().walk(_replace_roots(result, tuple(ordered)))
 
 
 def _render(data: Any) -> str:

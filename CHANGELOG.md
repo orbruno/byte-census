@@ -21,6 +21,8 @@ All notable changes to this project are recorded here.
   path on stderr; there is no `--force`. A missing parent directory still exits 1.
 - `dupfind` prints a deprecation notice on stderr (also with `--quiet`); stdout is
   unchanged. The adapter will be removed in 3.0.0.
+- The `byte-census` group reports usage errors as JSON on stderr instead of
+  Click's plain-text usage message; the exit code stays 2.
 
 ### Added
 
@@ -47,6 +49,25 @@ All notable changes to this project are recorded here.
   `getattr(os, ...)` forbidden everywhere.
 - Test that hashing and walking a fixture tree leave contents and
   modification times unchanged; reading may update access times.
+- Observation core (WI-CORE): `byte_census.model` with frozen dataclasses for
+  the `{data, meta}` envelope, findings (including classification fields),
+  suggestions, coverage entries, cost, and the error object, serialized in
+  contract field order, plus the contract ordering helpers and the finding ID
+  rule.
+- `byte_census.cost`: one wall-clock `elapsed_s` per command and mergeable
+  counters for content bytes read, entries visited, and subprocess calls and
+  stdout bytes; unmeasurable values are null with a note, never zero.
+- `byte_census.errors`: typed errors mapped to exit codes 1 (internal),
+  2 (usage), 3 (validation), and 4 (source unavailable). Every byte-census
+  error, including Click usage errors, is one JSON object on stderr with an
+  empty stdout and no traceback.
+- `--format json|table` scaffold for checks (`byte_census.command`). JSON is
+  the default; the table view uses no ANSI codes when stdout is not a TTY or
+  `NO_COLOR` is set.
+- Hidden internal command `byte-census _selftest`, not shown in `--help` and
+  not part of the public contract, which exercises the scaffold end to end.
+- Snapshot helper normalizes `meta.scope.roots[].st_dev` and path-derived IDs
+  in `id`, `finding_id`, `finding_ids`, and `suggestion_ids`.
 
 ## 2.0.0
 
