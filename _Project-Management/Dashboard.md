@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: dashboard
-source_fingerprint: sha256:c89b85d8c8a73212ff538fcf79f5625c8be83e61a6b700fde70c97467dbde7c9
+source_fingerprint: sha256:c8cd3bcbeba0ccc5dbb1898a10934cab5b26be8c44ddbd7a4eec0197ae231073
 ---
 
 # Project Management Dashboard - duplicate-finder-cli
@@ -16,21 +16,21 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 
 ## Overall Progress
 
-- Completed estimated points: 0
+- Completed estimated points: 19
 - Total included estimated points: 62
-- Remaining estimated points: 62
-- Estimated progress: 0 / 62 (0%)
+- Remaining estimated points: 43
+- Estimated progress: 19 / 62 (31%)
 - Unestimated active Work Items: 5
 
 ## Delivery Summary
 
-- Effective active Work Items: 24
-- Completed Work Items: 0
+- Effective active Work Items: 19
+- Completed Work Items: 5
 - Excluded Work Items: 0
-- Estimated active points: 62
-- Completed points: 0
+- Estimated active points: 43
+- Completed points: 19
 - Unestimated active Work Items: 5
-- Estimate coverage: 19/24 active items
+- Estimate coverage: 14/19 active items
 
 ## Epic Progress
 
@@ -42,12 +42,7 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 
 | ID | Kind | Epic | Title | Priority | Rank | Points | State |
 |---|---|---|---|---|---:|---:|---|
-| [WI-ADR-PYTHON](Work-Items/WI-ADR-PYTHON__python-implementation-decision.md) | decision | - | Record Python as the implementation language for byte-census | A | 1 | 1 | in_progress |
-| [WI-CONTRACTS](Work-Items/WI-CONTRACTS__observation-contracts-and-parity.md) | decision | - | Define the observation contracts, parity matrix, and ADR-002 adaptations | A | 2 | 5 | in_progress |
-| [WI-RENAME](Work-Items/WI-RENAME__rename-package-and-binary.md) | enabler | - | Move to a src layout with byte-census and dupfind entry points | A | 3 | 3 | in_progress |
-| [WI-QUALITY](Work-Items/WI-QUALITY__quality-infrastructure.md) | enabler | - | Provide snapshot, coverage, and CI infrastructure | A | 4 | 2 | in_progress |
 | [WI-SAFETY](Work-Items/WI-SAFETY__read-only-safety.md) | enabler | - | Enforce the read-only guarantee in code and tests | A | 5 | 5 | in_progress |
-| [WI-CORE](Work-Items/WI-CORE__observation-core.md) | enabler | - | Provide the observation model, cost meter, errors, and rendering | A | 6 | 8 | in_progress |
 | [WI-SUGGESTIONS](Work-Items/WI-SUGGESTIONS__risk-ordered-suggestions.md) | story | - | Provide the risk-ordered cleanup suggestion catalog | A | 7 | 2 | in_progress |
 | [WI-DUPLICATES](Work-Items/WI-DUPLICATES__duplicates-scan.md) | story | - | Find duplicates with size, partial-hash, and full-hash stages | A | 8 | 5 | in_progress |
 | [WI-LEGACY-ADAPTER](Work-Items/WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md) | enabler | - | Keep dupfind as a frozen v1 command with safe report output | A | 9 | 2 | in_progress |

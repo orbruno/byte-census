@@ -15,7 +15,10 @@ definition_of_done:
 dependencies: 
   - WI-RENAME
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../.github/workflows/ci.yml
+  - ../../tests/support/snapshots.py
+  - ../../tests/test_snapshots.py
 superseded_by: null
 relocated_to: null
 disposition_reason: null

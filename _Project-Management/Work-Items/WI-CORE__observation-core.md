@@ -17,7 +17,10 @@ dependencies:
   - WI-QUALITY
   - WI-SAFETY
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/test_model.py
+  - ../../tests/test_command.py
+  - ../../tests/test_errors.py
 superseded_by: null
 relocated_to: null
 disposition_reason: null

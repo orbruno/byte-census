@@ -15,7 +15,10 @@ definition_of_done:
 dependencies: 
   - WI-ADR-PYTHON
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/test_cli.py
+  - ../../tests/legacy/test_dupfind.py
+  - ../../CHANGELOG.md
 superseded_by: null
 relocated_to: null
 disposition_reason: null
