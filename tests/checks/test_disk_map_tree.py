@@ -155,19 +155,43 @@ def test_every_root_has_a_tree_including_nested_roots(
 def test_tree_is_built_from_the_single_walk(
     monkeypatch: pytest.MonkeyPatch, world: World
 ) -> None:
+    """Every folder under the root is listed exactly once, by any fsread path.
+
+    `_sorted_entries` is the one place where fsread lists a directory
+    (`walk`, `list_directory`, and the name listing all go through it).
+    """
     root = build(world)
     listed: list[str] = []
-    real = fsread.list_directory
+    real = fsread._sorted_entries
 
-    def counting(path: Any, root_dev: int | None = None) -> Any:
-        listed.append(os.fspath(path))
-        return real(path, root_dev)
+    def counting(path: Any) -> Any:
+        listed.append(str(path))
+        return real(path)
 
-    monkeypatch.setattr(fsread, "list_directory", counting)
-    run_map(monkeypatch, world, [root], "--tree-min-mb", "0", "--skip-categories")
+    monkeypatch.setattr(fsread, "_sorted_entries", counting)
+    result, _ = run_map(
+        monkeypatch, world, [root], "--tree-min-mb", "0", "--skip-categories"
+    )
 
-    walked = [p for p in listed if p.startswith(str(root))]
-    assert len(walked) == len(set(walked))
+    assert result.exit_code == 0, result.stderr
+    walked = sorted(
+        os.path.relpath(p, root)
+        for p in listed
+        if p == str(root) or p.startswith(str(root) + "/")
+    )
+    assert walked == sorted(
+        [
+            ".",
+            "big",
+            "big/a",
+            "big/a/b",
+            "big/a/b/c",
+            "big/a/b/c/d",
+            "empty",
+            "mid",
+            "small",
+        ]
+    )
 
 
 def test_mounts_are_not_tree_nodes(

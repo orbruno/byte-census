@@ -91,3 +91,24 @@ def test_malformed_docker_output_keeps_its_stdout_cost(
     assert DOCKER_ARGV in world.runner.calls
     assert payload["meta"]["cost"]["subprocess_stdout_bytes"] == expected
     assert expected >= len(garbage)
+
+
+def test_shared_location_keeps_the_uncertainty_of_every_tool(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    npmrc = make_file(world.home / ".npmrc", 20)
+    npm = world.home / ".npm"
+    make_file(npm / "_cacache" / "index", 5_000)
+    world.runner.answers[UV_ARGV] = str(npm) + "\n"
+    npmrc.chmod(0)
+    try:
+        _, payload = run_map(monkeypatch, world, [world.home / "Documents"])
+    finally:
+        npmrc.chmod(0o644)
+
+    caches = findings_of(payload, "tool_cache")
+    assert list(caches) == [str(npm)]
+    details = caches[str(npm)]["details"]
+    assert details["tool"] == "uv"
+    assert [other["tool"] for other in details["other_tools"]] == ["npm"]
+    assert str(npmrc) in details["location_uncertain"]

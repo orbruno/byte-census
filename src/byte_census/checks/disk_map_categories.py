@@ -115,11 +115,19 @@ def _locator(volume: DataVolume, lstat: Lstat, kind: str, **labels: Any) -> Loca
 
 
 def _merge_tool(first: DeclaredScope, later: DeclaredScope) -> DeclaredScope:
-    """Keep one scope per location; a later tool there is recorded, not counted."""
+    """Keep one scope per location; a later tool there is recorded, not counted.
+
+    Location uncertainty of every tool at the location is kept, in tool order.
+    """
     if later.kind != TOOL_CACHE:
         return first
     other = (later.tool, later.location_source)
-    return replace(first, other_tools=(*first.other_tools, other))
+    notes = [note for note in (first.uncertain, later.uncertain) if note]
+    return replace(
+        first,
+        other_tools=(*first.other_tools, other),
+        uncertain="; ".join(notes) if notes else None,
+    )
 
 
 def _collect(outcomes: Sequence[DeclaredScope | CoverageEntry | str | None]) -> Located:

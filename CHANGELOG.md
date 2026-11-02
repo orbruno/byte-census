@@ -31,6 +31,8 @@ All notable changes to this project are recorded here.
 
 ### Fixed
 
+- `disk map` keeps the npm location uncertainty when another tool shares
+  the same cache location.
 - `dupfind` hashes each file beneath its resolved scan root, opening every path
   component without following symlinks and checking the file against the lstat
   recorded during collection. A parent directory swapped for a symlink during a
