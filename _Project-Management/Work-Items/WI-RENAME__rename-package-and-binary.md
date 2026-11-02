@@ -8,7 +8,7 @@ profile: compact
 title: "Move to a src layout with byte-census and dupfind entry points"
 parent: null
 points: 3
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -52,7 +52,7 @@ Evidence:
 - 2026-11-02 parity check: v1 and new `dupfind` produce byte-identical stdout and stderr for json, csv and table on a fixture with nested, small and 200 KB duplicates; exit codes match for argument misuse (2).
 - Independent review: first review of 6ed35a6 BLOCKED (three functions over 50 lines; usage hint changed to `-h`); fixed in 3aa5f7c with a regression test; fresh re-review READY on 2026-11-02 (26 tests, coverage 85.90 percent, longest function 48 lines).
 - Error-path parity after the fix: unknown option, invalid value, invalid choice and missing compare path produce output and exit codes identical to v1 with the locked click 8.3.1; only `--help` layout differs, by design.
-- Closure: held open until the first CI run with the coverage gate and guard is green.
+- CI: run 41428758619 green on macos-latest at c27ab00 on 2026-11-02 (ruff, format check, full suite with the 80 percent coverage gate).
 
 ---
 Last Updated: 2026-11-02

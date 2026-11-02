@@ -8,7 +8,7 @@ profile: compact
 title: "Define the observation contracts, parity matrix, and ADR-002 adaptations"
 parent: null
 points: 5
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -54,8 +54,8 @@ Evidence:
 
 - [docs/contracts/](../../docs/contracts/README.md), written 2026-11-02: AC-01, AC-02, AC-05, AC-07 in quantities.md; AC-03 envelope.md and examples/ (six JSON files, all parse); AC-04 record-mapping.md (schema pinned by SHA-256); AC-06 argv-allowlist.md; AC-08 legacy-exit-codes.md; AC-09 parity-matrix.md; AC-10 adr-002-compliance.md.
 - Orchestrator corrections 2026-11-02: `--scan-root` stays required (no default traversal); dupfind keeps the v1 scanner instead of the new engine, honoring the frozen-adapter decision.
-- Independent review: pending.
-- Closure: held open until the first CI run with the coverage gate and guard is green.
+- Independent review: READY (see review history in this item and the 2026-11-02 plan and implementation reviews).
+- CI: run 41428758619 green on macos-latest at c27ab00 on 2026-11-02 (ruff, format check, full suite with the 80 percent coverage gate).
 
 ---
 Last Updated: 2026-11-02

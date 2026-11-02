@@ -8,7 +8,7 @@ profile: compact
 title: "Record Python as the implementation language for byte-census"
 parent: null
 points: 1
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -48,8 +48,8 @@ Evidence:
 
 - Decision record: [ADR-001](../../docs/adr/ADR-001__fw__python-implementation-language.md), written 2026-11-02; AC-01 sections 2 and 4, AC-02 section 3, AC-03 section 4 Condition, AC-04 section 6.
 - Benchmark: [results](../../docs/benchmarks/2026-11-02-traversal/results.md) with scripts beside it.
-- Independent review: pending.
-- Closure: held open until the first CI run with the coverage gate and guard is green (Product Backlog ordering rationale).
+- Independent review: READY (see review history in this item and the 2026-11-02 plan and implementation reviews).
+- CI: run 41428758619 green on macos-latest at c27ab00 on 2026-11-02 (ruff, format check, full suite with the 80 percent coverage gate).
 
 ---
 Last Updated: 2026-11-02
