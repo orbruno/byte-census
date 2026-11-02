@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: dashboard
-source_fingerprint: sha256:f5700c83e516fcca46e46706007eddff06e429012bab74cd3d6a66430e9fbe71
+source_fingerprint: sha256:fd030123491900f9ad3b9b8f400f93b7c4bef5b4a0987c673e5e53749ba84efe
 ---
 
 # Project Management Dashboard - duplicate-finder-cli

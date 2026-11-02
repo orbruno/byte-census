@@ -48,6 +48,7 @@ Out of scope:
 - AC-03: Nested roots are reported but not summed; hard links are deduplicated globally; complete totals are computed before display truncation; order is deterministic.
 - AC-04: Reconciliation reports a signed delta against `df -k /System/Volumes/Data`; a negative delta is flagged as overcount, not clamped to zero.
 - AC-05: Traversal is single-process; parallelism is out of scope.
+- AC-06: Disk map is observational and emits no cleanup suggestions: `suggestions` is always an empty list, and a finding whose location another check covers (duplicates, artifacts, caches, Docker) names that check in a `see_check` field; a test asserts both.
 
 ## Dependencies and Risks
 

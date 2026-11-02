@@ -25,4 +25,4 @@ else:
     kids=[e.path for e in os.scandir(root) if e.is_dir(follow_symlinks=False)]
     with ThreadPoolExecutor(10) as ex: r=list(ex.map(walk,kids))
     tot=sum(a for a,_ in r); n=sum(b for _,b in r)
-print(f"python-{mode}: {time.perf_counter()-t:.1f}s  {tot/1e9:.2f} GB  {n} entries")
+print(f"python-{mode}: {time.perf_counter()-t:.1f}s  {tot} bytes  {n} entries")
