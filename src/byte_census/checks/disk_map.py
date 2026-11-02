@@ -1,27 +1,39 @@
-"""`disk map`: where the data volume's used space is, under declared roots.
+"""`disk map`: where the data volume's used space is.
 
-Steps: canonicalize every `--scan-root` to the data volume (exit 3 otherwise),
-read `df -k /System/Volumes/Data` (exit 4 when it fails), walk each
-non-nested root once in a single process, then build findings from complete
-totals and cut the display to `--top` last. Reconciliation sums the counted
-contributions of the reconciliation units in attribution precedence.
+Steps: canonicalize every `--scan-root` to the data volume (exit 3
+otherwise), read `df -k /System/Volumes/Data` (exit 4 when it fails), read
+the optional system sources, locate the categories and tool caches (unless
+`--skip-categories`), place every scope in attribution precedence, walk each
+walked scope once in a single process with one shared identity ledger, then
+build findings from complete totals and cut the display to `--top` last.
 
-Extension seams (later Work Items, not implemented here):
-- WI-DISK-MAP-CATEGORIES appends category and tool-cache units after the
-  root units in `_reconciliation_units`, claiming through the same `Ledger`,
-  and passes tool-cache locations to `SeeCheckRules.for_home`.
-- WI-DISK-MAP-TREE adds the `tree` section in `_extra_sections`.
+Seam (later Work Item, not implemented here): WI-DISK-MAP-TREE adds the
+`tree` section in `_extra_sections`.
 """
 
+import errno
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 from byte_census import fsread, runner
+from byte_census.checks.disk_map_categories import (
+    CategorySpec,
+    Located,
+    default_categories,
+    locate_categories,
+    locate_tool_caches,
+)
+from byte_census.checks.disk_map_findings import (
+    Unit,
+    first_level,
+    large_files,
+    ordered,
+    unit,
+)
 from byte_census.checks.disk_map_reconcile import (
     Contribution,
-    DfRunner,
     DfUsage,
     parse_df,
     read_df,
@@ -30,23 +42,32 @@ from byte_census.checks.disk_map_reconcile import (
 from byte_census.checks.disk_map_roots import (
     DataVolume,
     Lstat,
-    RootPlan,
     canonical_root,
-    plan_roots,
+    merge_roots,
+)
+from byte_census.checks.disk_map_scopes import (
+    ROOT,
+    DeclaredScope,
+    Placement,
+    displayed_totals,
+    plan_scopes,
+    walk_plans,
 )
 from byte_census.checks.disk_map_see_check import SeeCheckRules
+from byte_census.checks.disk_map_system import Run, SystemContext, read_system
 from byte_census.checks.disk_map_walk import (
-    FIRST_LEVEL_VIEW,
-    LargeFile,
     Ledger,
-    RootWalk,
+    ScopeWalk,
     ViewTotals,
-    walk_root,
+    WalkRequest,
+    unreached_walk,
+    walk_scope,
 )
 from byte_census.command import CheckResult
 from byte_census.cost import CostCounters
 from byte_census.errors import ValidationError
-from byte_census.model import Data, Finding, Scope, finding_id, order_findings_by_size
+from byte_census.fsread import coverage_reason
+from byte_census.model import CoverageEntry, Data, Scope, ScopeRoot
 
 __all__ = [
     "DATA_VOLUME_MOUNT",
@@ -65,16 +86,10 @@ DATA_VOLUME_MOUNT = "/System/Volumes/Data"
 DEFAULT_TOP = 30
 DEFAULT_LARGE_FILE_MIN_MB = 500
 MIB = 1024 * 1024
-PREFIX = "map"
-KIND_RANK = ("root_total", "first_level", "large_file", "category", "tool_cache")
-CAVEAT_CLONES = "apfs_clone_or_shared_extent"
-CAVEAT_LINKS = "hard_links_merged"
-CAVEAT_SPARSE = "sparse_file"
-CAVEAT_INSIDE = "inside_other_scope"
-CAVEAT_ORDER = (CAVEAT_CLONES, CAVEAT_LINKS, CAVEAT_SPARSE, CAVEAT_INSIDE)
 
 
 def default_df_runner(argv: Sequence[str]) -> runner.RunResult:
+    """The allowlisted runner, for df and every optional source."""
     return runner.run(argv)
 
 
@@ -84,8 +99,18 @@ class DiskMapEnvironment:
 
     volume: DataVolume
     home: str
-    run_df: DfRunner = default_df_runner
+    run: Run = default_df_runner
     lstat: Lstat = fsread.lstat
+    environ: Mapping[str, str] = field(default_factory=dict)
+    categories: tuple[CategorySpec, ...] | None = None
+
+    def category_specs(self) -> tuple[CategorySpec, ...]:
+        if self.categories is not None:
+            return self.categories
+        return default_categories(self.home, self.volume.mount)
+
+    def tool_environ(self) -> dict[str, str]:
+        return {**self.environ, "HOME": self.home}
 
 
 def default_environment() -> DiskMapEnvironment:
@@ -99,209 +124,178 @@ def default_environment() -> DiskMapEnvironment:
             suggestion="Run disk map on macOS 10.15 or later with an APFS data volume.",
         ) from error
     volume = DataVolume(DATA_VOLUME_MOUNT, info.st_dev)
-    return DiskMapEnvironment(volume, os.environ.get("HOME", ""))
+    home = os.environ.get("HOME", "")
+    return DiskMapEnvironment(volume, home, environ=dict(os.environ))
 
 
 @dataclass(frozen=True)
 class Options:
     top: int = DEFAULT_TOP
     large_file_min_mb: int = DEFAULT_LARGE_FILE_MIN_MB
+    skip_categories: bool = False
 
-    def to_dict(self) -> dict[str, int]:
-        return {"top": self.top, "large_file_min_mb": self.large_file_min_mb}
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "top": self.top,
+            "large_file_min_mb": self.large_file_min_mb,
+            "skip_categories": self.skip_categories,
+        }
 
 
 @dataclass(frozen=True)
 class Measured:
-    """Every walk of one run and the run-wide hard-link view."""
+    """Every walk of one run and the shared identity ledger."""
 
-    plan: RootPlan
-    walks: tuple[RootWalk, ...]
-    merged: frozenset[tuple[str, str]] = frozenset()
-    merged_inodes: frozenset[tuple[int, int]] = field(default_factory=frozenset)
-
-
-def _caveats(*codes: str) -> tuple[str, ...]:
-    present = set(codes)
-    return tuple(code for code in CAVEAT_ORDER if code in present)
+    placements: tuple[Placement, ...]
+    walks: tuple[ScopeWalk, ...]
+    ledger: Ledger
 
 
-@dataclass(frozen=True)
-class Shown:
-    """What a disk map finding shows besides its kind and target."""
-
-    logical_bytes: int
-    allocated_bytes: int
-    caveats: tuple[str, ...]
-    see_check: str | None
-    details: Mapping[str, Any]
+def _root_scopes(env: DiskMapEnvironment, given: Sequence[str]) -> list[DeclaredScope]:
+    roots = merge_roots(canonical_root(g, env.volume, env.lstat) for g in given)
+    return [
+        DeclaredScope(ROOT, r.path, r.identity, r.chain, given=r.given) for r in roots
+    ]
 
 
-def _finding(kind: str, target: str, shown: Shown) -> Finding:
-    return Finding(
-        id=finding_id(PREFIX, kind, target),
-        kind=kind,
-        target=target,
-        logical_bytes=shown.logical_bytes,
-        allocated_bytes=shown.allocated_bytes,
-        caveats=shown.caveats,
-        see_check=shown.see_check,
-        details=shown.details,
-    )
+def _managed(env: DiskMapEnvironment, options: Options) -> tuple[Located, Located]:
+    if options.skip_categories:
+        return Located(), Located()
+    categories = locate_categories(env.category_specs(), env.volume, env.lstat)
+    tools = locate_tool_caches(env.tool_environ(), env.run, env.volume, env.lstat)
+    return categories, tools
 
 
-def _measure(plan: RootPlan, large_min_bytes: int) -> Measured:
+def _unreachable(request: WalkRequest, error: OSError) -> ScopeWalk:
+    """A walked scope that vanished or became unreadable after it was located."""
+    name = errno.errorcode.get(error.errno) if error.errno else None
+    path = request.scope.path
+    gap = CoverageEntry(path, coverage_reason(error.errno), name, "lstat")
+    return unreached_walk(request, gap)
+
+
+def _measure(placements: tuple[Placement, ...], large_min: int) -> Measured:
     ledger = Ledger()
-    walks = tuple(
-        walk_root(root, plan.nested(root), ledger, large_min_bytes)
-        for root in plan.walked
-    )
-    merged_inodes = frozenset(k for k in ledger.link_visits if ledger.merged(k))
-    return Measured(plan, walks, ledger.merged_views(), merged_inodes)
+    walks: list[ScopeWalk] = []
+    for plan in walk_plans(placements):
+        request = WalkRequest(plan.scope, plan.inner, plan.excluded)
+        try:
+            walks.append(walk_scope(request, ledger, large_min))
+        except OSError as error:
+            walks.append(_unreachable(request, error))
+    return Measured(placements, tuple(walks), ledger)
 
 
-def _views(measured: Measured, kind: str) -> dict[str, ViewTotals]:
-    return {
-        view.path: view
-        for walk in measured.walks
-        for view in walk.views
-        if view.kind == kind
-    }
+def _views(measured: Measured) -> dict[tuple[str, str], ViewTotals]:
+    return {view.key: view for walk in measured.walks for view in walk.views}
 
 
-def _root_units(measured: Measured, rules: SeeCheckRules) -> list[tuple[Finding, int]]:
-    """One root_total finding and counted contribution per root, by path."""
-    views = _views(measured, "root_total")
-    counted = {walk.root: walk.counted_allocated_bytes for walk in measured.walks}
-    units: list[tuple[Finding, int]] = []
-    for root in measured.plan.roots:
-        view = views[root.path]
-        nested = measured.plan.is_nested(root.path)
-        merged = view.key in measured.merged
-        caveats = [CAVEAT_CLONES]
-        caveats += [CAVEAT_LINKS] if merged else []
-        caveats += [CAVEAT_INSIDE] if nested else []
-        own = 0 if nested else counted[root.path]
-        details = {
-            "given": root.given,
-            "counted_allocated_bytes": own,
-            "overlap": "inside_scan_root" if nested else None,
-        }
-        shown = Shown(
-            view.logical_bytes,
-            view.allocated_bytes,
-            _caveats(*caveats),
-            rules.see_check(root.path, "root_total"),
-            details,
+def _units(
+    measured: Measured, rules: SeeCheckRules, coverage: Sequence[CoverageEntry]
+) -> list[Unit]:
+    """Reconciliation units in attribution precedence order."""
+    views = _views(measured)
+    shown = displayed_totals(measured.placements, views, measured.ledger.merged_views())
+    counted = {w.path: w.counted_allocated_bytes for w in measured.walks}
+    return [
+        unit(
+            placement,
+            shown[(placement.scope.kind, placement.scope.path)],
+            counted.get(placement.scope.path, 0),
+            rules,
+            coverage,
         )
-        finding = _finding("root_total", root.path, shown)
-        units.append((finding, own))
-    return units
-
-
-def _first_level(
-    measured: Measured, rules: SeeCheckRules, top: int
-) -> tuple[Finding, ...]:
-    """The `top` largest first-level folders of each root."""
-    by_owner: dict[str, list[Finding]] = {}
-    for view in _views(measured, FIRST_LEVEL_VIEW).values():
-        merged = view.key in measured.merged
-        shown = Shown(
-            view.logical_bytes,
-            view.allocated_bytes,
-            _caveats(CAVEAT_LINKS) if merged else (),
-            rules.see_check(view.path, FIRST_LEVEL_VIEW),
-            {"root": view.owner},
-        )
-        finding = _finding(FIRST_LEVEL_VIEW, view.path, shown)
-        by_owner.setdefault(view.owner, []).append(finding)
-    return tuple(
-        finding
-        for owner in sorted(by_owner)
-        for finding in order_findings_by_size(by_owner[owner])[:top]
-    )
-
-
-def _large_file(item: LargeFile, measured: Measured, rules: SeeCheckRules) -> Finding:
-    codes = [CAVEAT_LINKS] if item.inode in measured.merged_inodes else []
-    codes += [CAVEAT_SPARSE] if item.logical_bytes > item.allocated_bytes else []
-    shown = Shown(
-        item.logical_bytes,
-        item.allocated_bytes,
-        _caveats(*codes),
-        rules.see_check(item.path, "large_file"),
-        {"root": item.root},
-    )
-    return _finding("large_file", item.path, shown)
-
-
-def _ordered(findings: Sequence[Finding]) -> tuple[Finding, ...]:
-    """Kind rank, then the kind's size key descending, then target."""
-    ordered: list[Finding] = []
-    for kind in KIND_RANK:
-        group = [f for f in findings if f.kind == kind]
-        key = "logical_bytes" if kind == "large_file" else "allocated_bytes"
-        ordered.extend(order_findings_by_size(group, key))
-    return tuple(ordered)
-
-
-def _reconciliation_units(
-    measured: Measured, rules: SeeCheckRules
-) -> list[tuple[Finding, int]]:
-    """Reconciliation units in attribution precedence: roots by path.
-
-    Seam: categories (catalog order) and tool caches (uv, npm, brew) follow.
-    """
-    return _root_units(measured, rules)
+        for placement in measured.placements
+    ]
 
 
 def _extra_sections(
-    usage: DfUsage, units: Sequence[tuple[Finding, int]]
+    usage: DfUsage, system: SystemContext, units: Sequence[Unit]
 ) -> dict[str, Any]:
     """`reconciliation` and `system`; seam: WI-DISK-MAP-TREE adds `tree`."""
-    contributions = [Contribution(f.id, counted) for f, counted in units]
+    contributions = [Contribution(u.finding.id, u.counted) for u in units]
     return {
         "reconciliation": reconciliation(usage, contributions),
-        "system": {"df_data_volume": usage.to_dict()},
+        "system": {"df_data_volume": usage.to_dict(), **dict(system.fields)},
     }
 
 
-def _counters(measured: Measured, usage: DfUsage) -> CostCounters:
-    entries = sum(walk.entries_visited for walk in measured.walks)
-    return CostCounters().add_entries(entries).add_subprocess_call(usage.stdout_bytes)
+@dataclass(frozen=True)
+class Gathered:
+    """Measurements plus the sources and gaps found along the way."""
+
+    measured: Measured
+    usage: DfUsage
+    system: SystemContext
+    managed: tuple[Located, Located]
+
+    @property
+    def coverage(self) -> tuple[CoverageEntry, ...]:
+        found = [c for w in self.measured.walks for c in w.coverage]
+        return tuple(found) + tuple(c for m in self.managed for c in m.coverage)
+
+    @property
+    def mounts(self) -> tuple[str, ...]:
+        found = [m for w in self.measured.walks for m in w.skipped_mounts]
+        return tuple(found) + tuple(p for m in self.managed for p in m.mounts)
+
+    def counters(self) -> CostCounters:
+        entries = sum(w.entries_visited for w in self.measured.walks)
+        counters = CostCounters().add_entries(entries)
+        sizes = (self.usage.stdout_bytes, *self.system.stdout_sizes)
+        for size in (*sizes, *(s for m in self.managed for s in m.stdout_sizes)):
+            counters = counters.add_subprocess_call(size)
+        return counters
+
+
+def _gather(
+    env: DiskMapEnvironment, scan_roots: Sequence[str], options: Options
+) -> tuple[Gathered, tuple[DeclaredScope, ...]]:
+    roots = _root_scopes(env, scan_roots)
+    usage = read_df(env.run)
+    system = read_system(env.run)
+    categories, tools = _managed(env, options)
+    scopes = (*roots, *categories.scopes, *tools.scopes)
+    placements = plan_scopes(scopes)
+    measured = _measure(placements, options.large_file_min_mb * MIB)
+    return Gathered(measured, usage, system, (categories, tools)), scopes
 
 
 def disk_map(
     env: DiskMapEnvironment, scan_roots: Sequence[str], options: Options
 ) -> CheckResult:
-    """Validate roots, read df, measure every root, then build the result."""
-    roots = [canonical_root(given, env.volume, env.lstat) for given in scan_roots]
-    plan = plan_roots(roots)
-    usage = read_df(env.run_df)
-    measured = _measure(plan, options.large_file_min_mb * MIB)
-    rules = SeeCheckRules.for_home(env.home, env.volume.mount)
-    units = _reconciliation_units(measured, rules)
-    large = [
-        _large_file(item, measured, rules)
-        for walk in measured.walks
-        for item in walk.large_files
-    ]
-    findings = _ordered(
-        [f for f, _ in units] + [*_first_level(measured, rules, options.top), *large]
+    """Validate roots, read df, measure every scope, then build the result."""
+    gathered, scopes = _gather(env, scan_roots, options)
+    tool_paths = [s.path for s in scopes if s.kind == "tool_cache"]
+    rules = SeeCheckRules.for_home(env.home, env.volume.mount, tool_paths)
+    units = _units(gathered.measured, rules, gathered.coverage)
+    views = list(_views(gathered.measured).values())
+    ledger = gathered.measured.ledger
+    merged_inodes = frozenset(k for k in ledger.link_visits if ledger.merged(k))
+    depth = {s.path: len(s.chain) for s in scopes if s.kind == ROOT}
+    findings = ordered(
+        [
+            *(u.finding for u in units),
+            *first_level(views, ledger.merged_views(), rules, options.top),
+            *large_files(views, depth, merged_inodes, rules),
+        ]
     )
-    extra = _extra_sections(usage, units)
+    extra = _extra_sections(gathered.usage, gathered.system, units)
+    roots = [s for s in scopes if s.kind == ROOT]
     summary = {
-        "root_count": len(plan.roots),
+        "root_count": len(roots),
         "finding_count": len(findings),
         "measured_allocated_bytes": extra["reconciliation"]["measured_allocated_bytes"],
     }
+    unavailable = gathered.system.unavailable + gathered.managed[1].unavailable
     return CheckResult(
         data=Data(summary=summary, findings=findings, suggestions=(), extra=extra),
         scope=Scope(
-            roots=plan.roots,
+            roots=tuple(ScopeRoot(s.path, s.given, s.identity[0]) for s in roots),
             options=options.to_dict(),
-            skipped_mounts=tuple(m for w in measured.walks for m in w.skipped_mounts),
+            skipped_mounts=gathered.mounts,
         ),
-        counters=_counters(measured, usage),
-        incomplete_coverage=tuple(c for w in measured.walks for c in w.coverage),
+        counters=gathered.counters(),
+        incomplete_coverage=gathered.coverage,
+        unavailable_sources=unavailable,
     )

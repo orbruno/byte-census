@@ -7,126 +7,37 @@ computed independently from `os.walk` and `lstat`, never from the module.
 
 import json
 import os
-import stat
-from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
-from click.testing import CliRunner, Result
+from click.testing import CliRunner
 
 from byte_census import fsread, runner
 from byte_census.checks import disk_map
-from byte_census.checks.disk_map import DataVolume, DiskMapEnvironment
+from byte_census.checks.disk_map import DataVolume
 from byte_census.cli import main
-from tests.support.snapshots import assert_json_snapshot
-
-MIB = 1024 * 1024
-DF_ARGV = ("df", "-k", "/System/Volumes/Data")
-DF_HEADER = (
-    "Filesystem    1024-blocks      Used Available Capacity iused ifree %iused"
-    "  Mounted on\n"
+from tests.support.disk_map_world import (
+    DF_ARGV,
+    MIB,
+    OtherDevice,
+    World,
+    df_output,
+    expected_allocated,
+    expected_logical,
+    findings_of,
+    install,
+    make_file,
+    new_world,
+    run_map,
 )
-
-
-def df_output(used_kb: int, total_kb: int = 971350180) -> str:
-    available = total_kb - used_kb
-    return (
-        DF_HEADER + f"/dev/disk3s5 {total_kb} {used_kb} {available} 33% 1 2 0%"
-        "   /System/Volumes/Data\n"
-    )
-
-
-@dataclass
-class FakeDf:
-    """Answers `df -k /System/Volumes/Data` and records every argv."""
-
-    answer: str | Exception = field(default_factory=lambda: df_output(10**6))
-    returncode: int = 0
-    calls: list[tuple[str, ...]] = field(default_factory=list)
-
-    def __call__(self, argv: Sequence[str]) -> runner.RunResult:
-        self.calls.append(tuple(argv))
-        if isinstance(self.answer, Exception):
-            raise self.answer
-        return runner.RunResult(
-            argv=tuple(argv),
-            executable="/bin/df",
-            returncode=self.returncode,
-            stdout=self.answer,
-            stderr="",
-            stdout_bytes=len(self.answer.encode()),
-        )
-
-
-@dataclass
-class World:
-    data: Path
-    home: Path
-    df: FakeDf
-    lstat: Callable[[str], Any] = fsread.lstat
-
-    def environment(self) -> DiskMapEnvironment:
-        volume = DataVolume(str(self.data), os.lstat(self.data).st_dev)
-        return DiskMapEnvironment(volume, str(self.home), self.df, self.lstat)
+from tests.support.snapshots import assert_json_snapshot
 
 
 @pytest.fixture
 def world(tmp_path: Path) -> World:
-    data = tmp_path.resolve() / "data"
-    home = data / "Users" / "example"
-    home.mkdir(parents=True)
-    return World(data, home, FakeDf())
-
-
-def make_file(path: Path, size: int) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b"x" * size)
-    return path
-
-
-def inodes_under(*paths: Path) -> dict[tuple[int, int], os.stat_result]:
-    """Every distinct inode under the given trees, roots included."""
-    found: dict[tuple[int, int], os.stat_result] = {}
-    for top in paths:
-        info = os.lstat(top)
-        found[(info.st_dev, info.st_ino)] = info
-        for dirpath, dirnames, filenames in os.walk(top):
-            for name in dirnames + filenames:
-                info = os.lstat(Path(dirpath) / name)
-                found[(info.st_dev, info.st_ino)] = info
-    return found
-
-
-def expected_allocated(*paths: Path) -> int:
-    return sum(i.st_blocks * 512 for i in inodes_under(*paths).values())
-
-
-def expected_logical(*paths: Path) -> int:
-    return sum(
-        i.st_size for i in inodes_under(*paths).values() if stat.S_ISREG(i.st_mode)
-    )
-
-
-def install(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
-    monkeypatch.setattr(disk_map, "default_environment", world.environment)
-
-
-def run_map(
-    monkeypatch: pytest.MonkeyPatch, world: World, roots: Iterable[Path], *args: str
-) -> tuple[Result, dict[str, Any]]:
-    install(monkeypatch, world)
-    argv = ["disk", "map"]
-    for root in roots:
-        argv += ["--scan-root", str(root)]
-    result = CliRunner().invoke(main, [*argv, *args])
-    payload = json.loads(result.stdout) if result.stdout else {}
-    return result, payload
-
-
-def findings_of(payload: dict[str, Any], kind: str) -> dict[str, dict[str, Any]]:
-    return {f["target"]: f for f in payload["data"]["findings"] if f["kind"] == kind}
+    return new_world(tmp_path)
 
 
 def populate(world: World) -> tuple[Path, Path]:
@@ -146,7 +57,7 @@ def populate(world: World) -> tuple[Path, Path]:
 
 def test_happy_path_snapshot(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
     docs, music = populate(world)
-    world.df.answer = df_output(5000)
+    world.runner.answers[DF_ARGV] = df_output(5000)
     result, payload = run_map(
         monkeypatch, world, [docs, music], "--large-file-min", "1"
     )
@@ -308,13 +219,13 @@ def test_descent_never_crosses_a_device_change(
 ) -> None:
     docs, _ = populate(world)
     mounted = docs / "big"
-    real = fsread._entry_lstat
+    real = fsread.lstat
 
-    def fake(entry: os.DirEntry[str]) -> Any:
-        info = real(entry)
-        return OtherDevice(info) if entry.path == str(mounted) else info
+    def fake(path: Any) -> Any:
+        info = real(path)
+        return OtherDevice(info) if os.fspath(path) == str(mounted) else info
 
-    monkeypatch.setattr(fsread, "_entry_lstat", fake)
+    monkeypatch.setattr(fsread, "lstat", fake)
     _, payload = run_map(monkeypatch, world, [docs])
 
     assert payload["meta"]["scope"]["skipped_mounts"] == [str(mounted)]
@@ -324,18 +235,6 @@ def test_descent_never_crosses_a_device_change(
     )
     assert str(mounted) not in findings_of(payload, "first_level")
     assert payload["meta"]["status"] == "complete"
-
-
-class OtherDevice:
-    """An lstat result whose st_dev differs from its real device."""
-
-    def __init__(self, info: Any) -> None:
-        self._info = info
-
-    def __getattr__(self, name: str) -> Any:
-        if name == "st_dev":
-            return self._info.st_dev + 1
-        return getattr(self._info, name)
 
 
 # Roots and the data volume
@@ -358,7 +257,7 @@ def test_root_on_another_volume_exits_3(
     error = json.loads(result.stderr)
     assert error["code"] == "validation_error"
     assert "data volume" in error["reason"]
-    assert world.df.calls == []
+    assert world.runner.calls == []
 
 
 def test_firmlinked_root_maps_to_its_data_volume_form(tmp_path: Path) -> None:
@@ -447,33 +346,31 @@ def test_reconciliation_reports_a_signed_delta(
     monkeypatch: pytest.MonkeyPatch, world: World
 ) -> None:
     docs, _ = populate(world)
-    world.df.answer = df_output(used_kb=50_000, total_kb=100_000)
+    world.runner.answers[DF_ARGV] = df_output(used_kb=50_000, total_kb=100_000)
     _, payload = run_map(monkeypatch, world, [docs])
 
     measured = expected_allocated(docs)
     reconciliation = payload["data"]["reconciliation"]
-    assert world.df.calls == [DF_ARGV]
+    assert world.runner.calls[0] == DF_ARGV
     assert reconciliation["df_command"] == "df -k /System/Volumes/Data"
     assert reconciliation["df_used_bytes"] == 50_000 * 1024
     assert reconciliation["measured_allocated_bytes"] == measured
     assert reconciliation["delta_bytes"] == 50_000 * 1024 - measured
     assert reconciliation["overcount"] is False
-    assert payload["data"]["system"] == {
-        "df_data_volume": {
-            "mount": "/System/Volumes/Data",
-            "total_bytes": 100_000 * 1024,
-            "used_bytes": 50_000 * 1024,
-            "available_bytes": 50_000 * 1024,
-        }
+    assert payload["data"]["system"]["df_data_volume"] == {
+        "mount": "/System/Volumes/Data",
+        "total_bytes": 100_000 * 1024,
+        "used_bytes": 50_000 * 1024,
+        "available_bytes": 50_000 * 1024,
     }
-    assert payload["meta"]["cost"]["subprocess_calls"] == 1
+    assert payload["meta"]["cost"]["subprocess_calls"] == 7
 
 
 def test_measured_above_df_is_a_negative_overcount(
     monkeypatch: pytest.MonkeyPatch, world: World
 ) -> None:
     docs, _ = populate(world)
-    world.df.answer = df_output(used_kb=1)
+    world.runner.answers[DF_ARGV] = df_output(used_kb=1)
     _, payload = run_map(monkeypatch, world, [docs])
 
     reconciliation = payload["data"]["reconciliation"]
@@ -495,7 +392,7 @@ def test_df_failure_exits_4(
     monkeypatch: pytest.MonkeyPatch, world: World, answer: str | Exception
 ) -> None:
     docs, _ = populate(world)
-    world.df.answer = answer
+    world.runner.answers[DF_ARGV] = answer
     result, _ = run_map(monkeypatch, world, [docs])
 
     assert result.exit_code == 4
@@ -507,7 +404,7 @@ def test_df_failure_exits_4(
 
 def test_df_nonzero_exit_exits_4(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
     docs, _ = populate(world)
-    world.df.returncode = 1
+    world.runner.answers[DF_ARGV] = (1, "", "df: failed")
     result, _ = run_map(monkeypatch, world, [docs])
 
     assert result.exit_code == 4
@@ -537,7 +434,11 @@ def test_top_truncates_display_after_complete_totals(
     assert result.exit_code == 0
     first = findings_of(cut, "first_level")
     assert list(first) == [str(docs / "large")]
-    assert cut["meta"]["scope"]["options"] == {"top": 1, "large_file_min_mb": 500}
+    assert cut["meta"]["scope"]["options"] == {
+        "top": 1,
+        "large_file_min_mb": 500,
+        "skip_categories": False,
+    }
     for key in ("measured_allocated_bytes",):
         assert cut["data"]["summary"][key] == full["data"]["summary"][key]
     assert findings_of(cut, "root_total") == findings_of(full, "root_total")
@@ -627,7 +528,9 @@ def test_no_suggestions_and_see_check_precedence(
     make_file(project / "plain" / "target" / "t.o", 1000)
     make_file(world.home / "Downloads" / "big.iso", 2 * MIB)
     roots = [library, project, world.home / "Downloads", world.home]
-    _, payload = run_map(monkeypatch, world, roots, "--large-file-min", "1")
+    result, payload = run_map(monkeypatch, world, roots, "--large-file-min", "1")
+
+    assert result.exit_code == 0, result.stderr
 
     assert payload["data"]["suggestions"] == []
     assert all(f["suggestion_ids"] == [] for f in payload["data"]["findings"])

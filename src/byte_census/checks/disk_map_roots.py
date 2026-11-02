@@ -1,26 +1,34 @@
-"""Scan roots for `disk map`: canonical data-volume form and nesting.
+"""Scan roots for `disk map`: canonical data-volume form, identity, nesting.
 
 Each root is validated with `paths.validate_root` (realpath once, must be a
 directory), must lie on the data volume (same `st_dev` as the volume's
 mount), and is reported in its data-volume form. A firmlinked path such as
 `/Users/example` maps to `/System/Volumes/Data/Users/example` when that path
-is the same inode. Identical roots merge (first given wins); a root inside
-another root is nested: it is displayed but never walked again
+is the same inode. Each component is then respelled as the directory lists
+it, so case or normalization variants on a case-insensitive volume share
+one spelling.
+
+Paths are only labels: identity is `(st_dev, st_ino)`. Roots with the same
+identity merge (the first given wins), and nesting is decided by the
+identities of each root's ancestor chain, never by comparing strings
 (quantities.md, attribution precedence 1).
 """
 
 import os
+import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from byte_census.errors import ValidationError
-from byte_census.model import ScopeRoot, order_roots
+from byte_census.model import ScopeRoot
 from byte_census.paths import validate_root
 
 Lstat = Callable[[str], Any]
 Validate = Callable[[str], Path]
+ListNames = Callable[[str], list[str]]
+InodeKey = tuple[int, int]
 VOLUME_SUGGESTION = (
     "Pass a folder on the data volume, such as a folder under /Users or "
     "/System/Volumes/Data."
@@ -36,8 +44,63 @@ class DataVolume:
 
 
 def is_inside(path: str, ancestor: str) -> bool:
-    """True when path equals ancestor or lies below it."""
+    """True when path equals ancestor or lies below it (spelling only)."""
     return path == ancestor or path.startswith(ancestor.rstrip(os.sep) + os.sep)
+
+
+def identity(info: Any) -> InodeKey:
+    return (info.st_dev, info.st_ino)
+
+
+def list_names(path: str) -> list[str]:
+    """Names in a directory, without stat calls."""
+    with os.scandir(path) as iterator:
+        return [entry.name for entry in iterator]
+
+
+def ancestor_chain(path: str, lstat: Lstat) -> tuple[InodeKey, ...]:
+    """Identities of path and every ancestor up to `/`; unreadable ones skipped."""
+    chain: list[InodeKey] = []
+    current = path
+    while True:
+        try:
+            chain.append(identity(lstat(current)))
+        except OSError:
+            pass
+        parent = os.path.dirname(current)
+        if parent == current:
+            return tuple(chain)
+        current = parent
+
+
+def _fold(name: str) -> str:
+    return unicodedata.normalize("NFC", name).casefold()
+
+
+def _listed_name(parent: str, name: str, lstat: Lstat, names: ListNames) -> str:
+    """The spelling under which `parent` lists the entry reached as `name`."""
+    try:
+        listed = names(parent)
+        wanted = identity(lstat(os.path.join(parent, name)))
+    except OSError:
+        return name
+    if name in listed:
+        return name
+    for candidate in sorted(n for n in listed if _fold(n) == _fold(name)):
+        try:
+            if identity(lstat(os.path.join(parent, candidate))) == wanted:
+                return candidate
+        except OSError:
+            continue
+    return name
+
+
+def listed_spelling(path: str, lstat: Lstat, names: ListNames = list_names) -> str:
+    """Respell every component of an absolute path as its parent lists it."""
+    current = os.sep
+    for part in [p for p in path.split(os.sep) if p]:
+        current = os.path.join(current, _listed_name(current, part, lstat, names))
+    return current
 
 
 def _not_on_volume(given: str, reason: str) -> ValidationError:
@@ -48,11 +111,7 @@ def _not_on_volume(given: str, reason: str) -> ValidationError:
     )
 
 
-def _same_inode(a: Any, b: Any) -> bool:
-    return (a.st_dev, a.st_ino) == (b.st_dev, b.st_ino)
-
-
-def _data_form(resolved: str, info: Any, volume: DataVolume, lstat: Lstat) -> str:
+def data_form(resolved: str, info: Any, volume: DataVolume, lstat: Lstat) -> str:
     """The data-volume spelling of a resolved path on the data volume."""
     if is_inside(resolved, volume.mount):
         return resolved
@@ -61,7 +120,7 @@ def _data_form(resolved: str, info: Any, volume: DataVolume, lstat: Lstat) -> st
         mapped = lstat(candidate)
     except OSError:
         mapped = None
-    if mapped is None or not _same_inode(mapped, info):
+    if mapped is None or identity(mapped) != identity(info):
         raise _not_on_volume(
             resolved,
             f"{resolved} is on the data volume but {candidate} is not the same "
@@ -70,12 +129,31 @@ def _data_form(resolved: str, info: Any, volume: DataVolume, lstat: Lstat) -> st
     return candidate
 
 
+@dataclass(frozen=True)
+class CanonicalRoot:
+    """A validated root: listed data-volume spelling, argument, identity."""
+
+    path: str
+    given: str
+    st_dev: int
+    st_ino: int
+    chain: tuple[InodeKey, ...] = ()
+
+    @property
+    def identity(self) -> InodeKey:
+        return (self.st_dev, self.st_ino)
+
+    def scope_root(self) -> ScopeRoot:
+        return ScopeRoot(self.path, self.given, self.st_dev)
+
+
 def canonical_root(
     given: str,
     volume: DataVolume,
     lstat: Lstat,
     validate: Validate = validate_root,
-) -> ScopeRoot:
+    names: ListNames = list_names,
+) -> CanonicalRoot:
     """Validate one `--scan-root` and return it in data-volume form.
 
     Raises PathValidationError (exit 3) for an unusable path and
@@ -89,42 +167,14 @@ def canonical_root(
             f"{resolved} is on device {info.st_dev}, not on the data volume "
             f"{volume.mount} (device {volume.st_dev}).",
         )
-    return ScopeRoot(_data_form(resolved, info, volume, lstat), given, info.st_dev)
+    path = listed_spelling(data_form(resolved, info, volume, lstat), lstat, names)
+    chain = ancestor_chain(path, lstat)
+    return CanonicalRoot(path, given, info.st_dev, info.st_ino, chain)
 
 
-@dataclass(frozen=True)
-class RootPlan:
-    """Roots to walk, and for each walked root the roots nested inside it."""
-
-    roots: tuple[ScopeRoot, ...]
-    walked: tuple[str, ...]
-    nested_in: tuple[tuple[str, tuple[str, ...]], ...]
-
-    def nested(self, walked: str) -> tuple[str, ...]:
-        return dict(self.nested_in).get(walked, ())
-
-    def is_nested(self, path: str) -> bool:
-        return path not in self.walked
-
-
-def plan_roots(roots: Iterable[ScopeRoot]) -> RootPlan:
-    """Merge identical roots and assign each nested root to its walked root.
-
-    Roots are in ascending path order, so an enclosing root always precedes
-    the roots inside it.
-    """
-    ordered = order_roots(roots)
-    walked: list[str] = []
-    nested: dict[str, list[str]] = {}
-    for root in ordered:
-        owner = next((w for w in walked if is_inside(root.path, w)), None)
-        if owner is None:
-            walked.append(root.path)
-            nested[root.path] = []
-        else:
-            nested[owner].append(root.path)
-    return RootPlan(
-        roots=ordered,
-        walked=tuple(walked),
-        nested_in=tuple((w, tuple(nested[w])) for w in walked),
-    )
+def merge_roots(roots: Iterable[CanonicalRoot]) -> tuple[CanonicalRoot, ...]:
+    """One root per identity (first given wins), in ascending path order."""
+    merged: dict[InodeKey, CanonicalRoot] = {}
+    for root in roots:
+        merged.setdefault(root.identity, root)
+    return tuple(sorted(merged.values(), key=lambda r: r.path))

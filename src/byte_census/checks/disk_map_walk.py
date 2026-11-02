@@ -1,60 +1,62 @@
 """Single-process traversal for `disk map` (quantities.md).
 
-Each walked root is traversed once with `fsread.walk` (no symlinks followed,
-no `st_dev` crossing). One pass feeds several views: the root itself, each
-first-level folder, and every nested root (with its own first-level folders).
-A view's displayed totals count each distinct inode once inside that view.
+Each walked scope (a root, or a category or tool cache outside every earlier
+scope) is traversed once with `fsread.list_directory` (no symlinks followed,
+no `st_dev` crossing). Subtrees of earlier walked scopes are pruned, so walks
+never overlap. One pass feeds several views: the scope itself, every
+declared scope inside it (found by directory identity, not by spelling), and
+the first-level folders of each root view.
 
-`Ledger` holds the run-wide claims: it answers which root counts an inode
-first, so the sum of counted contributions is the union of everything walked.
-Walks never overlap (nested roots are not walked again, and later claimants
-such as categories must not descend into roots), so only inodes with more
-than one name can be seen twice; only those are remembered, which keeps
-memory proportional to hard-linked files rather than to all entries.
+`Ledger` is the run-wide identity ledger. Every inode is claimed once, by the
+first claimant in precedence order, so an inode reached twice through any
+alias is counted once and the sum of counted contributions is the allocated
+size of the union of everything walked.
 """
 
 import stat
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
 from byte_census import fsread
-from byte_census.checks.disk_map_roots import is_inside
 from byte_census.model import CoverageEntry
 
 InodeKey = tuple[int, int]
 ViewKey = tuple[str, str]  # (kind, path)
-ROOT_VIEW = "root_total"
+LinkBytes = tuple[InodeKey, int, int]  # (inode, allocated, logical)
 FIRST_LEVEL_VIEW = "first_level"
 LARGE_FILE_LIMIT = 20
 
 
-def _is_multi_link(info: Any) -> bool:
+def is_multi_link(info: Any) -> bool:
     return not stat.S_ISDIR(info.st_mode) and info.st_nlink > 1
 
 
-def _allocated(info: Any) -> int:
+def allocated_of(info: Any) -> int:
     return info.st_blocks * 512
+
+
+def is_sparse(info: Any) -> bool:
+    return stat.S_ISREG(info.st_mode) and info.st_size > allocated_of(info)
 
 
 @dataclass
 class Ledger:
     """Run-wide inode claims and the names each hard-linked inode was seen as."""
 
-    claimed: set[InodeKey] = field(default_factory=set)
+    claimed: dict[int, set[int]] = field(default_factory=dict)
     allocated_bytes: int = 0
     link_views: dict[InodeKey, set[ViewKey]] = field(default_factory=dict)
     link_visits: dict[InodeKey, int] = field(default_factory=dict)
 
     def claim(self, info: Any) -> int:
         """Allocated bytes this claim adds; 0 when an earlier claim had it."""
-        if _is_multi_link(info):
-            key = (info.st_dev, info.st_ino)
-            if key in self.claimed:
-                return 0
-            self.claimed.add(key)
-        self.allocated_bytes += _allocated(info)
-        return _allocated(info)
+        inodes = self.claimed.setdefault(info.st_dev, set())
+        if info.st_ino in inodes:
+            return 0
+        inodes.add(info.st_ino)
+        self.allocated_bytes += allocated_of(info)
+        return allocated_of(info)
 
     def record_link(self, info: Any, views: Iterable[ViewKey]) -> None:
         """Remember one name of a hard-linked inode and the views showing it."""
@@ -76,18 +78,14 @@ class Ledger:
 
 
 @dataclass(frozen=True)
-class ViewTotals:
-    """Displayed totals of one view."""
+class ViewSpec:
+    """A declared scope shown inside a walk, identified by its directory."""
 
     kind: str
     path: str
-    owner: str
-    logical_bytes: int
-    allocated_bytes: int
-
-    @property
-    def key(self) -> ViewKey:
-        return (self.kind, self.path)
+    identity: InodeKey
+    first_level: bool = False
+    large_files: bool = False
 
 
 @dataclass(frozen=True)
@@ -102,41 +100,22 @@ class LargeFile:
 
 
 @dataclass(frozen=True)
-class RootWalk:
-    """Everything one walk of one root measured."""
+class ViewTotals:
+    """Displayed totals of one view, with what unions and caveats need."""
 
-    root: str
-    views: tuple[ViewTotals, ...]
-    large_files: tuple[LargeFile, ...]
-    counted_allocated_bytes: int
-    entries_visited: int
-    coverage: tuple[CoverageEntry, ...]
-    skipped_mounts: tuple[str, ...]
+    kind: str
+    path: str
+    owner: str
+    logical_bytes: int
+    allocated_bytes: int
+    sparse: bool = False
+    observed: bool = True
+    links: tuple[LinkBytes, ...] = ()
+    large_files: tuple[LargeFile, ...] = ()
 
-
-class _View:
-    """Mutable accumulator for one view during one walk."""
-
-    def __init__(self, kind: str, path: str, owner: str) -> None:
-        self.kind, self.path, self.owner = kind, path, owner
-        self.links: set[InodeKey] = set()
-        self.logical = 0
-        self.allocated = 0
-
-    def add(self, info: Any) -> None:
-        if _is_multi_link(info):
-            key = (info.st_dev, info.st_ino)
-            if key in self.links:
-                return
-            self.links.add(key)
-        self.allocated += _allocated(info)
-        if stat.S_ISREG(info.st_mode):
-            self.logical += info.st_size
-
-    def totals(self) -> ViewTotals:
-        return ViewTotals(
-            self.kind, self.path, self.owner, self.logical, self.allocated
-        )
+    @property
+    def key(self) -> ViewKey:
+        return (self.kind, self.path)
 
 
 def large_file_order(item: LargeFile) -> tuple[int, str]:
@@ -144,71 +123,163 @@ def large_file_order(item: LargeFile) -> tuple[int, str]:
     return (-item.logical_bytes, item.path)
 
 
-class _RootTally:
-    """Mutable accumulator for one walked root; `result` freezes it."""
+def select_large(items: Iterable[LargeFile]) -> list[LargeFile]:
+    return sorted(items, key=large_file_order)[:LARGE_FILE_LIMIT]
 
-    def __init__(
-        self, root: str, nested: tuple[str, ...], ledger: Ledger, large_min: int
-    ) -> None:
-        self.root, self.nested, self.ledger = root, nested, ledger
-        self.large_min = large_min
-        self.roots = {path: _View(ROOT_VIEW, path, path) for path in (root, *nested)}
-        self.first: dict[str, _View] = {}
+
+class _View:
+    """Mutable accumulator for one view during one walk."""
+
+    def __init__(self, kind: str, path: str, owner: str, spec: ViewSpec) -> None:
+        self.kind, self.path, self.owner, self.spec = kind, path, owner, spec
+        self.links: dict[InodeKey, tuple[int, int]] = {}
+        self.logical = 0
+        self.allocated = 0
+        self.sparse = False
+        self.observed = False
         self.large: list[LargeFile] = []
+
+    def add(self, info: Any) -> None:
+        logical = info.st_size if stat.S_ISREG(info.st_mode) else 0
+        if is_multi_link(info):
+            key = (info.st_dev, info.st_ino)
+            if key in self.links:
+                return
+            self.links[key] = (allocated_of(info), logical)
+        self.allocated += allocated_of(info)
+        self.logical += logical
+        self.sparse = self.sparse or is_sparse(info)
+
+    def kind_key(self) -> ViewKey:
+        return (self.kind, self.path)
+
+    def add_large(self, item: LargeFile) -> None:
+        self.large.append(item)
+        if len(self.large) > 4 * LARGE_FILE_LIMIT:
+            self.large = select_large(self.large)
+
+    def totals(self) -> ViewTotals:
+        return ViewTotals(
+            kind=self.kind,
+            path=self.path,
+            owner=self.owner,
+            logical_bytes=self.logical,
+            allocated_bytes=self.allocated,
+            sparse=self.sparse,
+            observed=self.observed,
+            links=tuple((k, a, lg) for k, (a, lg) in sorted(self.links.items())),
+            large_files=tuple(select_large(self.large)),
+        )
+
+
+@dataclass(frozen=True)
+class ScopeWalk:
+    """Everything one walk of one scope measured."""
+
+    path: str
+    views: tuple[ViewTotals, ...]
+    counted_allocated_bytes: int
+    entries_visited: int
+    coverage: tuple[CoverageEntry, ...]
+    skipped_mounts: tuple[str, ...]
+
+
+def walk_pruned(
+    root: str, root_dev: int, prune: Callable[[fsread.WalkEntry], bool]
+) -> Iterator[fsread.WalkItem]:
+    """Depth-first walk in byte order of names; pruned directories vanish."""
+    stack = [iter(fsread.list_directory(root, root_dev))]
+    while stack:
+        item = next(stack[-1], None)
+        if item is None:
+            stack.pop()
+            continue
+        if isinstance(item, fsread.WalkEntry) and item.kind == "directory":
+            if prune(item):
+                continue
+            yield item
+            stack.append(iter(fsread.list_directory(item.path, root_dev)))
+            continue
+        yield item
+
+
+class _WalkTally:
+    """Mutable accumulator for one walked scope; `result` freezes it."""
+
+    def __init__(self, scope: ViewSpec, inner: tuple[ViewSpec, ...]) -> None:
+        self.scope = _View(scope.kind, scope.path, scope.path, scope)
+        self.scope.observed = True
+        self.pending: dict[InodeKey, list[ViewSpec]] = {}
+        for spec in inner:
+            self.pending.setdefault(spec.identity, []).append(spec)
+        self.active: list[tuple[str, _View]] = [(scope.path, self.scope)]
+        self.first: dict[str, _View] = {}
         self.counted = 0
         self.entries = 0
         self.coverage: list[CoverageEntry] = []
         self.mounts: list[str] = []
+        self.inner_views: list[_View] = []
 
-    def _first_level(self, owner: str, path: str, is_dir: bool) -> _View | None:
-        first = path[len(owner.rstrip("/")) + 1 :].split("/", 1)[0]
-        key = owner.rstrip("/") + "/" + first
+    def _activate(self, path: str, info: Any) -> None:
+        for spec in self.pending.pop((info.st_dev, info.st_ino), []):
+            view = _View(spec.kind, spec.path, spec.path, spec)
+            view.observed = True
+            self.inner_views.append(view)
+            self.active.append((path, view))
+
+    def _containing(self, path: str) -> list[tuple[str, _View]]:
+        return [
+            (prefix, view)
+            for prefix, view in self.active
+            if path == prefix or path.startswith(prefix.rstrip("/") + "/")
+        ]
+
+    def _first_level(
+        self, prefix: str, view: _View, path: str, is_dir: bool
+    ) -> _View | None:
+        if path == prefix or not view.spec.first_level:
+            return None
+        first = path[len(prefix.rstrip("/")) + 1 :].split("/", 1)[0]
+        key = prefix.rstrip("/") + "/" + first
         if key == path and is_dir:
-            self.first[key] = _View(FIRST_LEVEL_VIEW, key, owner)
+            target = view.path.rstrip("/") + "/" + first
+            self.first[key] = _View(FIRST_LEVEL_VIEW, target, view.path, view.spec)
+            self.first[key].observed = True
         return self.first.get(key)
 
-    def _views_for(self, path: str, is_dir: bool) -> list[_View]:
-        views = [self.roots[self.root]]
-        owners = [self.root]
-        for nested in self.nested:
-            if is_inside(path, nested):
-                views.append(self.roots[nested])
-                if path != nested:
-                    owners.append(nested)
-        for owner in owners:
-            view = self._first_level(owner, path, is_dir)
-            if view is not None:
-                views.append(view)
+    def views_for(self, path: str, info: Any) -> list[_View]:
+        is_dir = stat.S_ISDIR(info.st_mode)
+        if is_dir:
+            self._activate(path, info)
+        views: list[_View] = []
+        for prefix, view in self._containing(path):
+            views.append(view)
+            first = self._first_level(prefix, view, path, is_dir)
+            if first is not None:
+                views.append(first)
         return views
 
-    def add_inode(self, path: str, info: Any) -> None:
+    def add_inode(self, path: str, info: Any, large_min: int, ledger: Ledger) -> None:
         self.entries += 1
-        is_dir = stat.S_ISDIR(info.st_mode)
-        views = (
-            self._views_for(path, is_dir)
-            if path != self.root
-            else [self.roots[self.root]]
-        )
+        views = self.views_for(path, info)
         for view in views:
             view.add(info)
-        self.counted += self.ledger.claim(info)
-        if _is_multi_link(info):
-            self.ledger.record_link(info, ((v.kind, v.path) for v in views))
-        if stat.S_ISREG(info.st_mode) and info.st_size > self.large_min:
-            self._add_large(path, info)
+        self.counted += ledger.claim(info)
+        if is_multi_link(info):
+            ledger.record_link(info, (v.kind_key() for v in views))
+        if stat.S_ISREG(info.st_mode) and info.st_size > large_min:
+            self._add_large(path, info, views)
 
-    def _add_large(self, path: str, info: Any) -> None:
+    def _add_large(self, path: str, info: Any, views: list[_View]) -> None:
+        """Offer the file to the selection buffer of every root view holding it."""
         inode = (info.st_dev, info.st_ino)
-        self.large.append(
-            LargeFile(path, self.root, info.st_size, _allocated(info), inode)
-        )
-        if len(self.large) > 4 * LARGE_FILE_LIMIT:
-            self.large = sorted(self.large, key=large_file_order)[:LARGE_FILE_LIMIT]
+        for view in views:
+            if view.kind != FIRST_LEVEL_VIEW and view.spec.large_files:
+                size, allocated = info.st_size, allocated_of(info)
+                view.add_large(LargeFile(path, view.path, size, allocated, inode))
 
     def add_item(self, item: fsread.WalkItem) -> None:
-        if isinstance(item, fsread.WalkEntry):
-            self.add_inode(item.path, item.stat)
-        elif isinstance(item, fsread.SkippedMount):
+        if isinstance(item, fsread.SkippedMount):
             self.entries += 1
             self.mounts.append(item.path)
         else:
@@ -217,14 +288,16 @@ class _RootTally:
                 CoverageEntry(item.path, item.reason, item.errno_name, item.operation)
             )
 
-    def result(self) -> RootWalk:
-        views = [v.totals() for v in (*self.roots.values(), *self.first.values())]
-        return RootWalk(
-            root=self.root,
-            views=tuple(views),
-            large_files=tuple(
-                sorted(self.large, key=large_file_order)[:LARGE_FILE_LIMIT]
-            ),
+    def result(self) -> ScopeWalk:
+        unseen = [
+            _View(s.kind, s.path, s.path, s)
+            for specs in self.pending.values()
+            for s in specs
+        ]
+        views = [self.scope, *self.inner_views, *unseen, *self.first.values()]
+        return ScopeWalk(
+            path=self.scope.path,
+            views=tuple(v.totals() for v in views),
             counted_allocated_bytes=self.counted,
             entries_visited=self.entries,
             coverage=tuple(self.coverage),
@@ -232,15 +305,40 @@ class _RootTally:
         )
 
 
-def walk_root(
-    root: str, nested: tuple[str, ...], ledger: Ledger, large_min_bytes: int
-) -> RootWalk:
-    """Walk `root` once (itself included) and measure every view inside it.
+@dataclass(frozen=True)
+class WalkRequest:
+    """One scope to walk: itself, the scopes shown inside it, and prunes."""
 
-    Raises OSError when the root cannot be examined with `lstat`.
+    scope: ViewSpec
+    inner: tuple[ViewSpec, ...] = ()
+    excluded: frozenset[InodeKey] = frozenset()
+
+
+def walk_scope(request: WalkRequest, ledger: Ledger, large_min_bytes: int) -> ScopeWalk:
+    """Walk one scope (itself included) and measure every view inside it.
+
+    Raises OSError when the scope cannot be examined with `lstat`.
     """
-    tally = _RootTally(root, nested, ledger, large_min_bytes)
-    tally.add_inode(root, fsread.lstat(root))
-    for item in fsread.walk(root):
-        tally.add_item(item)
+    tally = _WalkTally(request.scope, request.inner)
+    root = request.scope.path
+    info = fsread.lstat(root)
+    tally.add_inode(root, info, large_min_bytes, ledger)
+
+    def prune(entry: fsread.WalkEntry) -> bool:
+        return (entry.stat.st_dev, entry.stat.st_ino) in request.excluded
+
+    for item in walk_pruned(root, info.st_dev, prune):
+        if isinstance(item, fsread.WalkEntry):
+            tally.add_inode(item.path, item.stat, large_min_bytes, ledger)
+        else:
+            tally.add_item(item)
     return tally.result()
+
+
+def unreached_walk(request: WalkRequest, gap: CoverageEntry) -> ScopeWalk:
+    """A scope that could not be examined: every view in it is unobserved."""
+    views = (
+        ViewTotals(spec.kind, spec.path, spec.path, 0, 0, observed=False)
+        for spec in (request.scope, *request.inner)
+    )
+    return ScopeWalk(request.scope.path, tuple(views), 0, 1, (gap,), ())

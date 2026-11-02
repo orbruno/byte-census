@@ -6,8 +6,9 @@ is signed, df used minus measured; a negative delta is an overcount and is
 never clamped to zero.
 """
 
+import re
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from byte_census import runner
@@ -22,6 +23,14 @@ NOTE = (
     "Signed delta: df used minus measured; negative means overcount and is "
     "never clamped."
 )
+BASE_HEADER = ("Filesystem", "1024-blocks", "Used", "Available", "Capacity")
+HEADERS = (
+    (*BASE_HEADER, "Mounted", "on"),
+    (*BASE_HEADER, "iused", "ifree", "%iused", "Mounted", "on"),
+)
+PERCENT_COLUMNS = frozenset({"Capacity", "%iused"})
+DIGITS = re.compile(r"[0-9]+")
+PERCENT = re.compile(r"[0-9]+%")
 DfRunner = Callable[[Sequence[str]], runner.RunResult]
 
 
@@ -33,14 +42,19 @@ class DfUsage:
     used_bytes: int
     available_bytes: int
     stdout_bytes: int = 0
+    mount: str = DATA_MOUNT
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "mount": DATA_MOUNT,
+            "mount": self.mount,
             "total_bytes": self.total_bytes,
             "used_bytes": self.used_bytes,
             "available_bytes": self.available_bytes,
         }
+
+
+class DfFormatError(ValueError):
+    """`df -k` output that is not exactly one header and one row for the mount."""
 
 
 def _unavailable(reason: str) -> SourceUnavailableError:
@@ -52,20 +66,46 @@ def _unavailable(reason: str) -> SourceUnavailableError:
     )
 
 
-def parse_df(stdout: str) -> DfUsage:
-    """Read 1024-blocks, Used, and Available from the last `df -k` line.
+def _columns(header: str) -> tuple[str, ...]:
+    """Data column names between `Filesystem` and `Mounted on`."""
+    names = tuple(header.split())
+    if names not in HEADERS:
+        raise DfFormatError(f"unexpected df header: {header.strip()!r}")
+    return names[1:-2]
 
-    The filesystem name may contain spaces, so the columns are the first
-    three consecutive integers on the line.
+
+def _row_values(row: str, mount: str, count: int) -> tuple[str, ...]:
+    """The `count` columns before the mount; the filesystem name keeps spaces."""
+    stripped = row.rstrip()
+    if not stripped.endswith(mount) or not stripped[: -len(mount)][-1:].isspace():
+        raise DfFormatError(f"df row is not for {mount}: {row.strip()!r}")
+    tokens = stripped[: -len(mount)].split()
+    if len(tokens) < count + 1:
+        raise DfFormatError(f"df row has too few columns: {row.strip()!r}")
+    return tuple(tokens[-count:])
+
+
+def parse_df(stdout: str, mount: str = DATA_MOUNT) -> DfUsage:
+    """Parse `df -k MOUNT`: exactly one known header and one row for MOUNT.
+
+    Columns are read by position from the header, counted back from the
+    mount point, so a filesystem name with spaces or digits cannot shift
+    them. Raises DfFormatError for anything else (512-blocks, extra lines,
+    another mount, malformed numbers).
     """
     lines = [line for line in stdout.splitlines() if line.strip()]
-    tokens = lines[-1].split() if len(lines) >= 2 else []
-    for index in range(len(tokens) - 2):
-        window = tokens[index : index + 3]
-        if all(token.isdigit() for token in window):
-            total, used, available = (int(token) * KIB for token in window)
-            return DfUsage(total, used, available)
-    raise _unavailable(f"`{DF_COMMAND}` printed no usage line: {stdout[:200]!r}")
+    if len(lines) != 2:
+        raise DfFormatError(f"df printed {len(lines)} lines, expected 2")
+    columns = _columns(lines[0])
+    values = dict(zip(columns, _row_values(lines[1], mount, len(columns)), strict=True))
+    for name, value in values.items():
+        pattern = PERCENT if name in PERCENT_COLUMNS else DIGITS
+        if not pattern.fullmatch(value):
+            raise DfFormatError(f"df column {name} is not valid: {value!r}")
+    total, used, available = (
+        int(values[name]) * KIB for name in ("1024-blocks", "Used", "Available")
+    )
+    return DfUsage(total, used, available, mount=mount)
 
 
 def read_df(run: DfRunner) -> DfUsage:
@@ -81,10 +121,11 @@ def read_df(run: DfRunner) -> DfUsage:
         raise _unavailable(
             f"`{DF_COMMAND}` exited with status {result.returncode}: {detail}"
         )
-    usage = parse_df(result.stdout)
-    return DfUsage(
-        usage.total_bytes, usage.used_bytes, usage.available_bytes, result.stdout_bytes
-    )
+    try:
+        usage = parse_df(result.stdout)
+    except DfFormatError as error:
+        raise _unavailable(f"`{DF_COMMAND}` output is not usable: {error}") from error
+    return replace(usage, stdout_bytes=result.stdout_bytes)
 
 
 @dataclass(frozen=True)

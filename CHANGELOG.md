@@ -10,6 +10,10 @@ All notable changes to this project are recorded here.
 
 ### Added
 
+- `byte-census disk map` also measures the ten macOS categories and the uv,
+  npm, and Homebrew caches (counted once against the roots), reports
+  `df -k /`, `diskutil info /`, the local snapshot count, and Docker usage as
+  system context, and accepts `--skip-categories`.
 - `byte-census docker scan` rejects unusable `docker system df` output (exit 4) and reports unparseable fields as null with a partial status; totals are null when any component is unknown.
 - `byte-census disk map --scan-root PATH` measures data-volume roots, their
   largest first-level folders and large files, and reconciles the total with

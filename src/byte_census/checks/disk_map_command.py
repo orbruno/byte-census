@@ -63,6 +63,12 @@ def disk() -> None:
     metavar="MB",
     help="List files larger than this many MiB (20 largest per root).",
 )
+@click.option(
+    "--skip-categories",
+    is_flag=True,
+    default=False,
+    help="Measure only the scan roots: no macOS categories and no tool caches.",
+)
 @format_option
 @click.pass_context
 def map_command(
@@ -70,14 +76,18 @@ def map_command(
     scan_roots: tuple[str, ...],
     top: int,
     large_file_min_mb: int,
+    skip_categories: bool,
     output_format: str,
 ) -> None:
     """
     Measure each scan root on the data volume, its largest first-level
-    folders and large files, and reconcile the total with
-    `df -k /System/Volumes/Data`. Nested and repeated roots are shown but
-    counted once; hard links are counted once. Read-only; it never suggests
-    or deletes anything.
+    folders and large files, the macOS categories (caches, application
+    support, containers, developer data, backups, Mail, Messages, Downloads,
+    Applications) and the uv, npm, and Homebrew caches, then reconcile the
+    total with `df -k /System/Volumes/Data`. Overlapping scopes are shown but
+    counted once; hard links are counted once. System context (`df -k /`,
+    `diskutil info /`, local snapshots, Docker) is informational. Read-only;
+    it never suggests or deletes anything.
 
     Example:
 
@@ -88,7 +98,11 @@ def map_command(
       # Files over 1 GiB, as a table
       byte-census disk map --scan-root ~ --large-file-min 1024 --format table
     """
-    options = disk_map.Options(top=top, large_file_min_mb=large_file_min_mb)
+    options = disk_map.Options(
+        top=top,
+        large_file_min_mb=large_file_min_mb,
+        skip_categories=skip_categories,
+    )
     run_observation(
         ctx,
         COMMAND,
