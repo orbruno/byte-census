@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: learnings
-source_fingerprint: sha256:fc1be39e6038be6a038533decc62287f102b3fa385f42af44843d8c0f544295c
+source_fingerprint: sha256:53783f7e8e41cac8084af177c8e8aa43db34afa065b6813535e949de8e058278
 ---
 
 # Learnings
