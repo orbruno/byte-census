@@ -234,6 +234,85 @@ def test_suggestion_removes_every_name_except_the_kept_copy(tmp_path: Path) -> N
     assert finding["suggestion_ids"] == [suggestion["id"]]
 
 
+def review_case(tmp_path: Path) -> Path:
+    """`report.pdf` hard-linked as `archive/link.pdf`, plus `report (1).pdf`.
+
+    By plain code point `archive/link.pdf` is the first name of all, so this
+    case separates rule (a), the primary name, from rule (b), copy order.
+    """
+    root = tmp_path / "root"
+    (root / "archive").mkdir(parents=True)
+    (root / "report.pdf").write_bytes(b"same")
+    os.link(root / "report.pdf", root / "archive" / "link.pdf")
+    (root / "report (1).pdf").write_bytes(b"same")
+    return root
+
+
+def test_rule_a_primary_is_shallowest_not_first_by_code_point(
+    tmp_path: Path,
+) -> None:
+    root = review_case(tmp_path)
+    base = str(root.resolve())
+
+    files = scan(str(root))["data"]["findings"][0]["details"]["files"]
+    linked = next(entry for entry in files if entry["hard_link_paths"])
+
+    assert linked["path"] == f"{base}/report.pdf"
+    assert linked["hard_link_paths"] == [f"{base}/archive/link.pdf"]
+
+
+def test_rule_b_keeps_first_copy_by_primary_name(tmp_path: Path) -> None:
+    root = review_case(tmp_path)
+    base = str(root.resolve())
+
+    payload = scan(str(root))
+    finding = payload["data"]["findings"][0]
+    (suggestion,) = payload["data"]["suggestions"]
+
+    assert [entry["path"] for entry in finding["details"]["files"]] == [
+        f"{base}/report (1).pdf",
+        f"{base}/report.pdf",
+    ]
+    assert suggestion["command"] == (
+        f"rm -- '{base}/report.pdf' && rm -- '{base}/archive/link.pdf'"
+    )
+    assert f"keeps '{base}/report (1).pdf'" in suggestion["reason"]
+    assert finding["reclaimable_estimate_bytes"] == allocated_bytes_of(
+        root / "report.pdf"
+    )
+
+
+def test_rule_b_orders_copies_by_code_point_not_depth(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    (root / "a-dir").mkdir(parents=True)
+    (root / "a-dir" / "z.pdf").write_bytes(b"same")
+    (root / "b.pdf").write_bytes(b"same")
+    base = str(root.resolve())
+
+    payload = scan(str(root))
+    files = payload["data"]["findings"][0]["details"]["files"]
+
+    assert [entry["path"] for entry in files] == [
+        f"{base}/a-dir/z.pdf",
+        f"{base}/b.pdf",
+    ]
+    assert payload["data"]["suggestions"][0]["command"] == f"rm -- '{base}/b.pdf'"
+
+
+def test_rule_a_ties_at_equal_depth_use_code_point(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "b.pdf").write_bytes(b"same")
+    os.link(root / "b.pdf", root / "a.pdf")
+    (root / "c.pdf").write_bytes(b"same")
+    base = str(root.resolve())
+
+    files = scan(str(root))["data"]["findings"][0]["details"]["files"]
+
+    assert files[0]["path"] == f"{base}/a.pdf"
+    assert files[0]["hard_link_paths"] == [f"{base}/b.pdf"]
+
+
 def test_finding_id_follows_content_hash(tree: Path) -> None:
     finding = scan(str(tree))["data"]["findings"][0]
 
@@ -541,23 +620,10 @@ def test_sparse_file_caveat(tmp_path: Path) -> None:
         assert "sparse_file" in finding["caveats"]
 
 
-def embedded_roots_masked(payload: dict[str, Any], roots: list[Path]) -> Any:
-    """Mask roots inside suggestion strings, where they follow a quote.
-
-    The snapshot helper masks only strings that start with a root; suggestion
-    commands and reasons quote paths mid-string.
-    """
-    text = json.dumps(payload)
-    for root in sorted({str(r) for r in roots}, key=len, reverse=True):
-        text = text.replace(f"'{root}/", "'<ROOT>/")
-    return json.loads(text)
-
-
 def test_snapshot(tree: Path) -> None:
-    roots = [tree, tree.resolve()]
-    payload = embedded_roots_masked(scan(str(tree)), roots)
+    payload = scan(str(tree))
 
-    assert_json_snapshot(payload, "duplicates-scan", roots=roots)
+    assert_json_snapshot(payload, "duplicates-scan", roots=[tree, tree.resolve()])
 
 
 def test_table_format(tree: Path) -> None:

@@ -126,7 +126,7 @@ Catalog for 1.0.0:
 | `brew-cleanup` | caches scan | check-wide | `brew cleanup` | low |
 | `npm-cache-verify` | caches scan | check-wide | `npm cache verify` | low |
 | `artifact-remove-regenerate` | artifacts scan | per finding | `rm -rf -- '<artifact>' && cd -- '<project>' && <regenerate>` | medium |
-| `duplicate-remove-extra-copies` | duplicates scan | per finding | `rm -- '<path>'` for every name of every copy except the one that sorts first | high |
+| `duplicate-remove-extra-copies` | duplicates scan | per finding | `rm -- '<path>'` for every name of every copy except the kept copy: each removed copy's primary name, then its `hard_link_paths` (see Duplicate copies and names, under Ordering) | high |
 
 Decision: a check-wide suggestion is emitted once per run when at least one related finding is shown, and lists every related finding that appears in the output; findings dropped by `--top` selection are never referenced, so no ID dangles. A tool-cache suggestion is emitted only when that tool's cache was found. `docker-system-prune-all` relates to Images, Containers, and Build Cache only: without `--volumes` it removes no volume, so volumes relate only to `docker-volume-prune`.
 
@@ -156,7 +156,7 @@ Presentation rules:
 | `finding.suggestion_ids` | Order of `data.suggestions`. |
 | `suggestion.finding_ids` | Order of `data.findings`. |
 | `reconciliation.contributions` (disk map) | Attribution precedence (quantities.md): roots by path, categories in catalog order, tool caches uv, npm, brew. |
-| `details.files` (duplicates) | `path` ascending; `hard_link_paths` within a file also `path` ascending. |
+| `details.files` (duplicates) | Copies by primary name (`path`) ascending, rule (b) below; `hard_link_paths` within a file also ascending. |
 | `images` | `docker_reported_size_bytes` descending, then repository, tag, image ID. |
 | `stopped_containers` | Name, then container ID. |
 | `tree.roots` | `path` ascending. |
@@ -164,6 +164,17 @@ Presentation rules:
 | `scope.roots` | `path` ascending; identical resolved roots are merged. |
 | `incomplete_coverage` | `path`, then `reason`. |
 | `unavailable_sources` | `source`. |
+
+### Duplicate copies and names
+
+A duplicate group holds copies, one per distinct inode `(st_dev, st_ino)`. Two separate rules decide its order:
+
+- (a) Primary name of an inode: the name with the fewest path components (the shallowest), then code-point order among names of equal depth. The primary name is `details.files[].path`; the inode's other names are its `hard_link_paths`.
+- (b) Copy order within a group: copies are ordered by their primary names in code-point order. Depth plays no part in this rule. The kept copy is the first copy in this order.
+
+Everything else follows from these two rules: `details.files` is in copy order; the `duplicate-remove-extra-copies` command removes, for every copy after the kept one, its primary name and then its `hard_link_paths`; `reclaimable_estimate_bytes` is the sum of `allocated_bytes` of every copy except the kept one.
+
+Example: `report.pdf` hard-linked as `archive/report-link.pdf`, and a separate copy `report (1).pdf`. By rule (a) the linked inode's primary name is `report.pdf`, although `archive/report-link.pdf` sorts first by code point. By rule (b) `report (1).pdf` sorts before `report.pdf` (a space sorts before a period), so `report (1).pdf` is kept and both names of the other copy are removed.
 
 ## Error object
 

@@ -35,7 +35,7 @@ class Inode:
 
     @property
     def primary(self) -> str:
-        """Decision: the shallowest name, then code-point order."""
+        """Rule (a), envelope.md: the shallowest name, then code-point order."""
         return min(self.names, key=lambda name: (name.count("/"), name))
 
     @property

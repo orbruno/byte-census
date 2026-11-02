@@ -83,6 +83,7 @@ def _content_digests(
 
 
 def _to_group(bucket: Sequence[tuple[Inode, str, str]]) -> Group:
+    """Rule (b), envelope.md: copies by primary name in code-point order."""
     members = tuple(sorted((item[0] for item in bucket), key=lambda i: i.primary))
     return Group(bucket[0][2], bucket[0][1], members)
 
