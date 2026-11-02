@@ -1,11 +1,14 @@
 """JSON snapshot helper with normalization of volatile fields.
 
-Normalized: `meta.captured_at`, `meta.cost`, `meta.scope.st_dev`, every
-`meta.scope.roots[].st_dev`, fixture root prefixes in strings, and the
-path-derived IDs in `id`, `finding_id`, `finding_ids`, and `suggestion_ids`.
-An ID `<prefix>-<12 hex>` becomes `<prefix>-<IDn>`, numbered by first
+Normalized: `meta.captured_at`, `meta.cost.elapsed_s` (the counters and
+notes are kept), integer `meta.scope.st_dev` and `meta.scope.roots[].st_dev`,
+fixture root prefixes in strings, and the path-derived IDs in `id`,
+`finding_id`, `finding_ids`, and `suggestion_ids`. Before IDs are renumbered,
+every `data.findings[].id` must equal the contract rule
+`finding_id(prefix, kind, target)`. An ID `<prefix>-<12 hex>` becomes `<prefix>-<IDn>`, numbered by first
 appearance, so cross-references stay checkable while hashes of machine paths
 drop out. A suggestion ID `<catalog>@<finding-id>` keeps its catalog part.
+Snapshots keep key order, so field order is part of the comparison.
 """
 
 import copy
@@ -15,6 +18,8 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
+
+from byte_census.model import finding_id
 
 SNAPSHOT_DIR = Path(__file__).resolve().parent.parent / "snapshots"
 UPDATE_ENV = "BYTE_CENSUS_UPDATE_SNAPSHOTS"
@@ -42,22 +47,38 @@ def _replace_roots(value: Any, roots: tuple[str, ...]) -> Any:
     return value
 
 
+def _mask_st_dev(holder: Any) -> None:
+    if isinstance(holder, dict) and type(holder.get("st_dev")) is int:
+        holder["st_dev"] = ST_DEV_TOKEN
+
+
 def _mask_meta(data: dict[str, Any]) -> None:
     meta = data.get("meta")
     if not isinstance(meta, dict):
         return
     if "captured_at" in meta:
         meta["captured_at"] = "<CAPTURED_AT>"
-    if "cost" in meta:
-        meta["cost"] = "<COST>"
+    cost = meta.get("cost")
+    if isinstance(cost, dict) and "elapsed_s" in cost:
+        cost["elapsed_s"] = "<ELAPSED_S>"
     scope = meta.get("scope")
     if not isinstance(scope, dict):
         return
-    if "st_dev" in scope:
-        scope["st_dev"] = ST_DEV_TOKEN
+    _mask_st_dev(scope)
     for root in scope.get("roots") or []:
-        if isinstance(root, dict) and "st_dev" in root:
-            root["st_dev"] = ST_DEV_TOKEN
+        _mask_st_dev(root)
+
+
+def _check_finding_ids(data: Any) -> None:
+    body = data.get("data") if isinstance(data, dict) else None
+    findings = body.get("findings") if isinstance(body, dict) else None
+    for finding in findings or []:
+        prefix = str(finding["id"]).split("-", 1)[0]
+        expected = finding_id(prefix, finding["kind"], finding["target"])
+        if finding["id"] != expected:
+            raise AssertionError(
+                f"finding id {finding['id']} breaks the ID rule; expected {expected}"
+            )
 
 
 class _IdNumbering:
@@ -90,6 +111,7 @@ class _IdNumbering:
 
 def normalize(data: Any, roots: Iterable[str | os.PathLike[str]] = ()) -> Any:
     """Return a copy of data with volatile and machine-specific fields masked."""
+    _check_finding_ids(data)
     result = copy.deepcopy(data)
     if isinstance(result, dict):
         _mask_meta(result)
@@ -98,7 +120,7 @@ def normalize(data: Any, roots: Iterable[str | os.PathLike[str]] = ()) -> Any:
 
 
 def _render(data: Any) -> str:
-    return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
 
 def assert_json_snapshot(

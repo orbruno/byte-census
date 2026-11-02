@@ -141,3 +141,29 @@ def test_cost_notes_are_read_only() -> None:
 
     with pytest.raises(TypeError):
         cost.notes["x"] = "y"  # type: ignore[index]
+
+
+def test_counters_reject_null_without_note() -> None:
+    with pytest.raises(ValueError, match="note"):
+        CostCounters(entries_visited=None)
+
+
+def test_counters_reject_note_for_measured_field() -> None:
+    with pytest.raises(ValueError, match="note"):
+        CostCounters(note_items=(("entries_visited", "x"),))
+
+
+def test_counters_with_null_and_note_are_valid_and_hashable() -> None:
+    counters = CostCounters(
+        entries_visited=None, note_items=(("entries_visited", "x"),)
+    )
+
+    assert counters.notes == {"entries_visited": "x"}
+    assert hash(counters) == hash(pickle.loads(pickle.dumps(counters)))
+
+
+@pytest.mark.parametrize("field", ["content_bytes_read", "subprocess_calls"])
+def test_unmeasured_works_for_every_counter(field: str) -> None:
+    counters = CostCounters().unmeasured(field, "lost")
+
+    assert counters.notes == {field: "lost"}

@@ -124,7 +124,7 @@ Privacy consent dialogs: macOS may show a consent dialog to the terminal applica
 
 | Field | Type | Definition |
 |---|---|---|
-| `elapsed_s` | number | One wall-clock measurement from command start to the end of rendering, rounded to milliseconds. Never a sum of per-stage or per-worker times. |
+| `elapsed_s` | number | One wall-clock measurement: wall-clock time from the start of the command callback until the envelope is complete, just before serialization; rendering cannot time its own end. Rounded to milliseconds. Never a sum of per-stage or per-worker times. |
 | `content_bytes_read` | integer | Bytes returned by byte-census's own `read` calls on file content (hashing). Directory listings and `lstat` are not content reads. Reading subprocess pipes is not counted here. |
 | `entries_visited` | integer | Directory entries examined (each `lstat` or `scandir` entry), including hard-link repeats and entries later excluded. Metadata-only checks therefore report their real work. |
 | `subprocess_calls` | integer | Calls made through the runner, successful or not. |

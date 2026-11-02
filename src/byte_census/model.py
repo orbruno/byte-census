@@ -3,14 +3,15 @@
 Every check reports through these frozen dataclasses. `to_dict` returns plain
 dicts and lists with the exact field names and field order of the contract
 examples. Mapping fields (`details`, `summary`, `options`, `extra`, `notes`)
-are frozen on construction, so a model object cannot change after creation.
+are frozen on construction into `FrozenMap`, a tuple of pairs with read-only
+mapping access, so model objects cannot change and are hashable and
+picklable. Only JSON types are accepted.
 """
 
 import hashlib
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from types import MappingProxyType
 from typing import Any
 
 from byte_census import __version__
@@ -21,33 +22,53 @@ TOOL_NAME = "byte-census"
 # Finding ID prefixes from envelope.md; `tst` is internal to `_selftest`.
 ID_PREFIXES = frozenset({"dkr", "cch", "art", "dup", "map", "tst"})
 RISKS = ("low", "medium", "high")
-EXIT_CODES: Mapping[str, int] = MappingProxyType(
-    {
-        "internal_error": 1,
-        "usage_error": 2,
-        "validation_error": 3,
-        "source_unavailable": 4,
-    }
-)
+EXIT_CODES: Mapping[str, int] = {
+    "internal_error": 1,
+    "usage_error": 2,
+    "validation_error": 3,
+    "source_unavailable": 4,
+}
 PARTIAL_SOURCE_REASONS = frozenset({"failed", "timed_out"})
-COST_NULLABLE = (
-    "content_bytes_read",
-    "entries_visited",
-    "subprocess_calls",
-    "subprocess_stdout_bytes",
-    "subprocess_content_bytes_read",
-)
+JSON_SCALARS = (str, int, float, bool, type(None))
 
-EMPTY: Mapping[str, Any] = MappingProxyType({})
+
+@dataclass(frozen=True, eq=False)
+class FrozenMap(Mapping[str, Any]):
+    """Read-only, hashable, picklable mapping stored as a tuple of pairs."""
+
+    pairs: tuple[tuple[str, Any], ...] = ()
+
+    def __getitem__(self, key: str) -> Any:
+        for name, value in self.pairs:
+            if name == key:
+                return value
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return (name for name, _ in self.pairs)
+
+    def __len__(self) -> int:
+        return len(self.pairs)
+
+    def __hash__(self) -> int:
+        return hash(self.pairs)
+
+
+EMPTY = FrozenMap()
 
 
 def freeze(value: Any) -> Any:
-    """Return a read-only deep copy: mappings become proxies, lists tuples."""
+    """Return a read-only deep copy of JSON data: mappings become FrozenMap,
+    lists tuples. Raises TypeError for anything that is not a JSON type."""
     if isinstance(value, Mapping):
-        return MappingProxyType({key: freeze(item) for key, item in value.items()})
+        if not all(isinstance(key, str) for key in value):
+            raise TypeError(f"mapping keys must be strings: {list(value)!r}")
+        return FrozenMap(tuple((key, freeze(item)) for key, item in value.items()))
     if isinstance(value, (list, tuple)):
         return tuple(freeze(item) for item in value)
-    return value
+    if isinstance(value, JSON_SCALARS):
+        return value
+    raise TypeError(f"not a JSON value: {type(value).__name__}")
 
 
 def thaw(value: Any) -> Any:
@@ -57,11 +78,6 @@ def thaw(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [thaw(item) for item in value]
     return value
-
-
-def _freeze_fields(obj: Any, *names: str) -> None:
-    for name in names:
-        object.__setattr__(obj, name, freeze(getattr(obj, name)))
 
 
 def finding_id(prefix: str, kind: str, target: str) -> str:
@@ -116,7 +132,9 @@ class Finding:
     details: Mapping[str, Any] = EMPTY
 
     def __post_init__(self) -> None:
-        _freeze_fields(self, "caveats", "suggestion_ids", "details")
+        object.__setattr__(self, "caveats", freeze(self.caveats))
+        object.__setattr__(self, "suggestion_ids", freeze(self.suggestion_ids))
+        object.__setattr__(self, "details", freeze(self.details))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -151,7 +169,7 @@ class Suggestion:
             raise ValueError(f"unknown risk: {self.risk!r}")
         if self.requires_owner_authorization is not True:
             raise ValueError("requires_owner_authorization is always true")
-        _freeze_fields(self, "finding_ids")
+        object.__setattr__(self, "finding_ids", freeze(self.finding_ids))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -216,7 +234,9 @@ class Scope:
     skipped_mounts: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        _freeze_fields(self, "roots", "options", "skipped_mounts")
+        object.__setattr__(self, "roots", tuple(self.roots))
+        object.__setattr__(self, "options", freeze(self.options))
+        object.__setattr__(self, "skipped_mounts", freeze(self.skipped_mounts))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -224,6 +244,16 @@ class Scope:
             "options": thaw(self.options),
             "skipped_mounts": list(self.skipped_mounts),
         }
+
+
+def check_null_notes(values: Mapping[str, Any], notes: Mapping[str, str]) -> None:
+    """Every null value has exactly one note, and only null values have one."""
+    nulls = {name for name, value in values.items() if value is None}
+    if nulls != set(notes):
+        raise ValueError(
+            f"cost needs exactly one note per null field: nulls={sorted(nulls)}, "
+            f"notes={sorted(notes)}"
+        )
 
 
 @dataclass(frozen=True)
@@ -239,19 +269,24 @@ class Cost:
     notes: Mapping[str, str] = EMPTY
 
     def __post_init__(self) -> None:
-        _freeze_fields(self, "notes")
-        nulls = {name for name in COST_NULLABLE if getattr(self, name) is None}
-        if nulls != set(self.notes):
-            raise ValueError(
-                f"cost needs exactly one note per null field: nulls={sorted(nulls)}, "
-                f"notes={sorted(self.notes)}"
-            )
+        object.__setattr__(self, "notes", freeze(self.notes))
+        check_null_notes(self.counters(), self.notes)
+
+    def counters(self) -> dict[str, int | None]:
+        """The nullable counters, in contract order."""
+        return {
+            "content_bytes_read": self.content_bytes_read,
+            "entries_visited": self.entries_visited,
+            "subprocess_calls": self.subprocess_calls,
+            "subprocess_stdout_bytes": self.subprocess_stdout_bytes,
+            "subprocess_content_bytes_read": self.subprocess_content_bytes_read,
+        }
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "elapsed_s": self.elapsed_s,
-            **{name: getattr(self, name) for name in COST_NULLABLE},
-            "notes": dict(self.notes),
+            **self.counters(),
+            "notes": thaw(self.notes),
         }
 
 
@@ -289,7 +324,9 @@ class Meta:
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        _freeze_fields(self, "incomplete_coverage", "unavailable_sources")
+        coverage = tuple(self.incomplete_coverage)
+        object.__setattr__(self, "incomplete_coverage", coverage)
+        object.__setattr__(self, "unavailable_sources", tuple(self.unavailable_sources))
 
     @property
     def status(self) -> str:
@@ -322,7 +359,10 @@ class Data:
         clash = {"summary", "findings", "suggestions"} & set(self.extra)
         if clash:
             raise ValueError(f"extra repeats a fixed data key: {sorted(clash)}")
-        _freeze_fields(self, "summary", "findings", "suggestions", "extra")
+        object.__setattr__(self, "summary", freeze(self.summary))
+        object.__setattr__(self, "findings", tuple(self.findings))
+        object.__setattr__(self, "suggestions", tuple(self.suggestions))
+        object.__setattr__(self, "extra", freeze(self.extra))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -375,13 +415,20 @@ class ErrorInfo:
         }
 
 
+SIZE_KEYS: Mapping[str, Callable[[Finding], int | None]] = {
+    "allocated_bytes": lambda finding: finding.allocated_bytes,
+    "logical_bytes": lambda finding: finding.logical_bytes,
+}
+
+
 def order_findings_by_size(
     findings: Iterable[Finding], key: str = "allocated_bytes"
 ) -> tuple[Finding, ...]:
     """Size key descending (null last), then target by code point."""
+    size_of = SIZE_KEYS[key]
 
     def sort_key(finding: Finding) -> tuple[bool, int, str]:
-        size = getattr(finding, key)
+        size = size_of(finding)
         return (size is None, -(size or 0), finding.target)
 
     return tuple(sorted(findings, key=sort_key))

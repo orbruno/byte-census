@@ -14,14 +14,9 @@ from byte_census.render.table_format import render_table
 FORMATS = ("json", "table")
 
 
-def no_color_requested(environ: Mapping[str, str]) -> bool:
-    """NO_COLOR set to a non-empty value (no-color.org)."""
-    return bool(environ.get("NO_COLOR"))
-
-
 def color_enabled(stream: Any, environ: Mapping[str, str]) -> bool:
     """True only for a TTY stream without a non-empty NO_COLOR."""
-    if no_color_requested(environ):
+    if environ.get("NO_COLOR"):
         return False
     isatty = getattr(stream, "isatty", None)
     return bool(isatty()) if callable(isatty) else False
@@ -39,7 +34,6 @@ def render(payload: Mapping[str, Any], output_format: str, *, color: bool) -> st
 __all__ = [
     "FORMATS",
     "color_enabled",
-    "no_color_requested",
     "render",
     "render_json",
     "render_table",

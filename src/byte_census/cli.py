@@ -2,7 +2,10 @@
 
 `ByteCensusGroup.main` is the single error path: every failure becomes the
 JSON error object on stderr with exit code 1, 2, 3, or 4, and stdout stays
-empty. Click usage errors are converted to the same shape. Nothing prompts.
+empty. Click usage errors are converted to the same shape. `invoke` converts
+errors that Click raises without a context (a missing option value) and
+interruptions before Click sees them, so the help hint names the subcommand
+and stderr holds exactly one JSON object. Nothing prompts.
 """
 
 import sys
@@ -11,12 +14,35 @@ from typing import Any
 import click
 
 from byte_census import __version__
-from byte_census.errors import TOOL_HELP, emit_error, to_byte_census_error
+from byte_census.errors import (
+    TOOL_HELP,
+    emit_error,
+    to_byte_census_error,
+    usage_error,
+)
 from byte_census.selftest import selftest
+
+
+def _subcommand_path(ctx: click.Context) -> str:
+    if ctx.invoked_subcommand is None:
+        return ctx.command_path
+    return f"{ctx.command_path} {ctx.invoked_subcommand}"
 
 
 class ByteCensusGroup(click.Group):
     """Click group whose standalone mode reports errors as JSON."""
+
+    def invoke(self, ctx: click.Context) -> Any:
+        try:
+            return super().invoke(ctx)
+        except click.UsageError as error:
+            if error.ctx is not None:
+                raise
+            path = _subcommand_path(ctx)
+            raise usage_error(path, error.format_message()) from error
+        except (click.Abort, KeyboardInterrupt) as error:
+            help_hint = f"{_subcommand_path(ctx)} --help"
+            raise to_byte_census_error(error).with_help(help_hint) from error
 
     def main(self, *args: Any, standalone_mode: bool = True, **kwargs: Any) -> Any:
         if not standalone_mode:

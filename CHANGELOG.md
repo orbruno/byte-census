@@ -23,6 +23,15 @@ All notable changes to this project are recorded here.
   unchanged. The adapter will be removed in 3.0.0.
 - The `byte-census` group reports usage errors as JSON on stderr instead of
   Click's plain-text usage message; the exit code stays 2.
+- A missing option value and an interruption (Ctrl-C) now name the subcommand
+  in the error's `help`, and stderr holds exactly one JSON object. Every runner
+  failure other than a rejected argv (including an untrusted executable path
+  and oversized output) exits 4.
+- `meta.cost.elapsed_s` is defined as the time from the start of the command
+  callback until the envelope is complete, just before serialization.
+- Snapshots keep field order and the cost counters; only `elapsed_s`,
+  `captured_at`, integer `st_dev`, and finding IDs are masked, and every
+  finding ID is checked against the ID rule before masking.
 
 ### Added
 

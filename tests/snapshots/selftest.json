@@ -1,73 +1,81 @@
 {
   "data": {
+    "summary": {
+      "entries": 3,
+      "findings": 1
+    },
     "findings": [
       {
-        "allocated_bytes": null,
-        "caveats": [],
-        "classification": {
-          "confidence": "low",
-          "disposition": "investigate",
-          "owner": "",
-          "recovery": "unknown",
-          "status": "unknown"
-        },
-        "details": {
-          "entries": 3
-        },
         "id": "tst-<ID1>",
         "kind": "selftest",
+        "target": "<ROOT>",
         "logical_bytes": null,
+        "allocated_bytes": null,
         "reclaimable_estimate_bytes": null,
+        "caveats": [],
         "see_check": null,
         "suggestion_ids": [
           "selftest-noop@tst-<ID1>"
         ],
-        "target": "<ROOT>"
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "entries": 3
+        }
       }
     ],
     "suggestions": [
       {
+        "id": "selftest-noop@tst-<ID1>",
         "command": "true",
+        "risk": "low",
+        "reversible": true,
+        "requires_owner_authorization": true,
+        "reason": "Internal self-test suggestion; it changes nothing.",
         "finding_ids": [
           "tst-<ID1>"
-        ],
-        "id": "selftest-noop@tst-<ID1>",
-        "reason": "Internal self-test suggestion; it changes nothing.",
-        "requires_owner_authorization": true,
-        "reversible": true,
-        "risk": "low"
+        ]
       }
-    ],
-    "summary": {
-      "entries": 3,
-      "findings": 1
-    }
+    ]
   },
   "meta": {
-    "captured_at": "<CAPTURED_AT>",
-    "command": "_selftest",
-    "cost": "<COST>",
-    "incomplete_coverage": [],
     "schema_version": "1.0.0",
-    "scope": {
-      "options": {
-        "fail": null,
-        "partial": false
-      },
-      "roots": [
-        {
-          "given": "<ROOT>",
-          "path": "<ROOT>",
-          "st_dev": "<ST_DEV>"
-        }
-      ],
-      "skipped_mounts": []
-    },
-    "status": "complete",
     "tool": {
       "name": "byte-census",
       "version": "2.0.0"
     },
+    "command": "_selftest",
+    "captured_at": "<CAPTURED_AT>",
+    "status": "complete",
+    "scope": {
+      "roots": [
+        {
+          "path": "<ROOT>",
+          "given": "<ROOT>",
+          "st_dev": "<ST_DEV>"
+        }
+      ],
+      "options": {
+        "fail": null,
+        "partial": false
+      },
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": "<ELAPSED_S>",
+      "content_bytes_read": 0,
+      "entries_visited": 3,
+      "subprocess_calls": 0,
+      "subprocess_stdout_bytes": 0,
+      "subprocess_content_bytes_read": 0,
+      "notes": {}
+    },
+    "incomplete_coverage": [],
     "unavailable_sources": []
   }
 }

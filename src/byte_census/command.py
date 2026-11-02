@@ -9,6 +9,7 @@ error the group prints on stderr. Checks never print and never prompt.
 
 import os
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
@@ -17,7 +18,7 @@ from typing import Any
 import click
 
 from byte_census.cost import CostCounters, CostMeter
-from byte_census.errors import ByteCensusError, to_byte_census_error
+from byte_census.errors import to_byte_census_error
 from byte_census.model import (
     CoverageEntry,
     Data,
@@ -32,7 +33,7 @@ from byte_census.model import (
     order_suggestions,
     order_unavailable,
 )
-from byte_census.render import FORMATS, no_color_requested, render
+from byte_census.render import FORMATS, color_enabled, render
 
 
 @dataclass(frozen=True)
@@ -61,17 +62,12 @@ def format_option(func: Callable[..., Any]) -> Callable[..., Any]:
     )(func)
 
 
-def stdout_is_tty() -> bool:
-    """Whether stdout is an interactive terminal."""
-    return sys.stdout.isatty()
-
-
 def _default_now() -> datetime:
     return datetime.now(UTC)
 
 
 def _use_color() -> bool:
-    return stdout_is_tty() and not no_color_requested(os.environ)
+    return color_enabled(sys.stdout, os.environ)
 
 
 def build_envelope(
@@ -97,26 +93,27 @@ def build_envelope(
     return Envelope(data=data, meta=meta)
 
 
-def _with_help(error: ByteCensusError, help_hint: str) -> ByteCensusError:
-    if error.help is not None:
-        return error
-    return type(error)(error.error, error.reason, error.suggestion, help=help_hint)
-
-
 def run_observation(
-    ctx: click.Context, command: str, output_format: str, check: Check
+    ctx: click.Context,
+    command: str,
+    output_format: str,
+    check: Check,
+    *,
+    clock: Callable[[], float] | None = None,
+    now: Callable[[], datetime] | None = None,
 ) -> None:
     """Run one check and print its envelope; failures raise ByteCensusError.
 
-    `elapsed_s` runs from the start of this call to the moment the envelope
-    is complete, immediately before serialization.
+    `elapsed_s` runs from the start of this call until the envelope is
+    complete, just before serialization. `clock` (monotonic seconds) and
+    `now` (aware datetime) default to the system clocks.
     """
     try:
-        meter = CostMeter.start()
-        captured_at = format_captured_at(_default_now())
+        meter = CostMeter.start(clock or time.monotonic)
+        captured_at = format_captured_at((now or _default_now)())
         envelope = build_envelope(command, captured_at, check(), meter)
         text = render(envelope.to_dict(), output_format, color=_use_color())
-    except Exception as error:
+    except (Exception, KeyboardInterrupt) as error:
         mapped = to_byte_census_error(error)
-        raise _with_help(mapped, f"{ctx.command_path} --help") from error
+        raise mapped.with_help(f"{ctx.command_path} --help") from error
     click.echo(text, nl=False)

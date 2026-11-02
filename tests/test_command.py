@@ -7,6 +7,7 @@ the no-prompt rule (WI-CORE AC-01, AC-03 to AC-07).
 
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,8 @@ from click.testing import CliRunner, Result
 
 from byte_census import command
 from byte_census.cli import main
+from byte_census.command import CheckResult, format_option, run_observation
+from byte_census.model import Data
 from tests.support.snapshots import assert_json_snapshot
 
 ANSI = "\x1b["
@@ -34,8 +37,24 @@ def invoke(args: list[str], **kwargs: Any) -> Result:
     return CliRunner().invoke(main, args, **kwargs)
 
 
+class TtyStream:
+    def isatty(self) -> bool:
+        return True
+
+
+def pretend_tty(monkeypatch: pytest.MonkeyPatch) -> None:
+    real = command.color_enabled
+    monkeypatch.setattr(
+        command, "color_enabled", lambda _stream, environ: real(TtyStream(), environ)
+    )
+
+
 def error_of(result: Result) -> dict[str, Any]:
+    """stderr must be exactly one JSON object followed by one newline."""
     assert result.stdout == ""
+    assert result.stderr.startswith("{"), repr(result.stderr)
+    assert result.stderr.endswith("}\n"), repr(result.stderr)
+    assert result.stderr.count("\n") == 1, repr(result.stderr)
     payload = json.loads(result.stderr)
     assert list(payload) == ERROR_KEYS
     assert payload["exit_code"] == result.exit_code
@@ -124,6 +143,8 @@ def test_walk_errors_become_incomplete_coverage(tree: Path) -> None:
         ["_selftest", "--format", "csv"],
         ["_selftest", "--fail", "nope"],
         ["_selftest", "extra-argument"],
+        ["_selftest", "--root"],
+        ["_selftest", "--format"],
         ["no-such-command"],
         ["--bogus"],
     ],
@@ -137,11 +158,28 @@ def test_usage_errors_exit_2_as_json(args: list[str]) -> None:
     assert payload["help"].endswith("--help")
 
 
-def test_usage_error_help_names_the_subcommand() -> None:
-    payload = error_of(invoke(["_selftest", "--bogus"]))
+@pytest.mark.parametrize(
+    ("args", "fragment"),
+    [
+        (["_selftest", "--bogus"], "--bogus"),
+        (["_selftest", "--root"], "requires an argument"),
+        (["_selftest", "--format"], "requires an argument"),
+    ],
+)
+def test_usage_error_help_names_the_subcommand(args: list[str], fragment: str) -> None:
+    payload = error_of(invoke(args))
 
     assert payload["help"] == "byte-census _selftest --help"
-    assert "--bogus" in payload["reason"]
+    assert payload["suggestion"] == (
+        "Run `byte-census _selftest --help` to see the valid options and arguments."
+    )
+    assert fragment in payload["reason"]
+
+
+def test_group_level_usage_error_points_to_group_help() -> None:
+    payload = error_of(invoke(["--bogus"]))
+
+    assert payload["help"] == "byte-census --help"
 
 
 @pytest.mark.parametrize("bad", ["/definitely/not/here", "bad\x01name"])
@@ -177,16 +215,63 @@ def test_internal_error_exits_1_without_traceback() -> None:
     assert "RuntimeError" in payload["reason"]
 
 
-def test_interrupt_exits_1_as_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    def interrupt(**_: Any) -> None:
-        raise KeyboardInterrupt
+@pytest.mark.parametrize("exc", [KeyboardInterrupt, click.Abort])
+def test_interrupt_exits_1_with_exactly_one_json_object(
+    monkeypatch: pytest.MonkeyPatch, exc: type[BaseException]
+) -> None:
+    def interrupt() -> None:
+        raise exc
 
     monkeypatch.setattr(command, "_default_now", interrupt)
 
     result = invoke(["_selftest"])
 
     assert result.exit_code == 1
-    assert json.loads(result.stderr.strip())["code"] == "internal_error"
+    payload = error_of(result)
+    assert payload["code"] == "internal_error"
+    assert "interrupted" in payload["error"]
+    assert payload["help"] == "byte-census _selftest --help"
+
+
+def test_interrupt_outside_the_scaffold_names_the_subcommand() -> None:
+    @click.command("boom")
+    def boom() -> None:
+        raise KeyboardInterrupt
+
+    wrapped = type(main)("byte-census", commands={"boom": boom})
+
+    result = CliRunner().invoke(wrapped, ["boom"])
+
+    assert result.exit_code == 1
+    assert error_of(result)["help"] == "byte-census boom --help"
+
+
+def _fixed_command(**kwargs: Any) -> click.Command:
+    @click.command("fixed")
+    @format_option
+    @click.pass_context
+    def fixed(ctx: click.Context, output_format: str) -> None:
+        run_observation(
+            ctx,
+            "fixed",
+            output_format,
+            lambda: CheckResult(data=Data(summary={"n": 1})),
+            **kwargs,
+        )
+
+    return fixed
+
+
+def test_run_observation_accepts_clock_and_now() -> None:
+    ticks = iter([10.0, 12.5])
+    moment = datetime(2026, 11, 2, 9, 30, tzinfo=UTC)
+    cmd = _fixed_command(clock=lambda: next(ticks), now=lambda: moment)
+
+    result = CliRunner().invoke(cmd, [])
+
+    meta = json.loads(result.stdout)["meta"]
+    assert meta["captured_at"] == "2026-11-02T09:30:00Z"
+    assert meta["cost"]["elapsed_s"] == 2.5
 
 
 def test_help_and_version_still_exit_zero() -> None:
@@ -216,7 +301,7 @@ def test_table_format_has_no_ansi_without_tty(tree: Path) -> None:
 def test_table_format_has_ansi_on_tty(
     tree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(command, "stdout_is_tty", lambda: True)
+    pretend_tty(monkeypatch)
     monkeypatch.delenv("NO_COLOR", raising=False)
 
     result = invoke(["_selftest", "--format", "table"], color=True)
@@ -225,7 +310,7 @@ def test_table_format_has_ansi_on_tty(
 
 
 def test_no_color_disables_ansi_on_tty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(command, "stdout_is_tty", lambda: True)
+    pretend_tty(monkeypatch)
 
     result = invoke(
         ["_selftest", "--format", "table"], color=True, env={"NO_COLOR": "1"}
@@ -236,15 +321,11 @@ def test_no_color_disables_ansi_on_tty(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_json_has_no_ansi_on_tty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(command, "stdout_is_tty", lambda: True)
+    pretend_tty(monkeypatch)
 
     result = invoke(["_selftest"], color=True)
 
     assert ANSI not in result.stdout
-
-
-def test_stdout_is_tty_reads_stdout() -> None:
-    assert command.stdout_is_tty() in (True, False)
 
 
 def test_cli_never_reads_stdin(tree: Path) -> None:

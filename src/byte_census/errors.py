@@ -12,12 +12,7 @@ import click
 
 from byte_census.model import EXIT_CODES, ErrorInfo
 from byte_census.paths import PathValidationError
-from byte_census.runner import (
-    CommandLaunchError,
-    CommandTimeoutError,
-    ExecutableNotFoundError,
-    RunnerError,
-)
+from byte_census.runner import RejectedArgvError, RunnerError
 
 TOOL_HELP = "byte-census --help"
 
@@ -39,6 +34,23 @@ class ByteCensusError(Exception):
     @property
     def exit_code(self) -> int:
         return EXIT_CODES[self.code]
+
+    def with_help(self, help_hint: str) -> "ByteCensusError":
+        """A copy whose `help` is `help_hint`, unless help is already set.
+
+        The copy is made without calling the subclass `__init__`, whose
+        signature may differ.
+        """
+        if self.help is not None:
+            return self
+        cls = type(self)
+        clone = cls.__new__(cls)
+        Exception.__init__(clone, *self.args)
+        clone.error = self.error
+        clone.reason = self.reason
+        clone.suggestion = self.suggestion
+        clone.help = help_hint
+        return clone
 
     def info(self, help_hint: str = TOOL_HELP) -> ErrorInfo:
         """The error object; an explicit `help` wins over the caller's hint."""
@@ -82,14 +94,19 @@ _RUNNER_FIXES = {
 }
 
 
-def _from_usage(error: click.UsageError) -> ArgumentUsageError:
-    path = error.ctx.command_path if error.ctx is not None else "byte-census"
+def usage_error(path: str, message: str) -> ArgumentUsageError:
+    """Exit 2 for the command at `path`, pointing to its own help."""
     return ArgumentUsageError(
         error=f"{path} was called with invalid arguments",
-        reason=error.format_message(),
+        reason=message,
         suggestion=f"Run `{path} --help` to see the valid options and arguments.",
         help=f"{path} --help",
     )
+
+
+def _from_usage(error: click.UsageError) -> ArgumentUsageError:
+    path = error.ctx.command_path if error.ctx is not None else "byte-census"
+    return usage_error(path, error.format_message())
 
 
 def _from_path(error: PathValidationError) -> ValidationError:
@@ -132,8 +149,7 @@ def to_byte_census_error(error: BaseException) -> ByteCensusError:
         return _from_usage(error)
     if isinstance(error, PathValidationError):
         return _from_path(error)
-    unavailable = (ExecutableNotFoundError, CommandTimeoutError, CommandLaunchError)
-    if isinstance(error, unavailable):
+    if isinstance(error, RunnerError) and not isinstance(error, RejectedArgvError):
         return _from_runner(error)
     return _internal(error)
 

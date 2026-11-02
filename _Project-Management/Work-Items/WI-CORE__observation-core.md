@@ -46,7 +46,7 @@ Out of scope:
 
 - AC-01: JSON output uses `{data, meta}` matching the CONTRACTS examples, with `meta.schema_version`, `captured_at`, `scope` (including the measured `st_dev`), `cost`, `status`, and `incomplete_coverage`.
 - AC-02: Findings carry the classification fields defined in CONTRACTS from the first release, so later items do not change the finding shape.
-- AC-03: `cost.elapsed_s` is one wall-clock measurement from command start to the end of rendering and is never summed; `content_bytes_read` counts bytes returned by the application's own reads; `entries_visited` counts directory entries examined, so metadata-only checks report real work; values that cannot be measured, such as reads inside subprocesses, are null with a note, never zero; counters from multiple processes are summed.
+- AC-03: `cost.elapsed_s` is one wall-clock measurement from command start until the envelope is complete, before serialization and is never summed; `content_bytes_read` counts bytes returned by the application's own reads; `entries_visited` counts directory entries examined, so metadata-only checks report real work; values that cannot be measured, such as reads inside subprocesses, are null with a note, never zero; counters from multiple processes are summed.
 - AC-04: Errors are JSON on stderr with `error`, `reason`, `suggestion`, and `help`; Click usage errors are converted to the same shape.
 - AC-05: Exit codes are 0 success (including partial coverage, reported in `meta`), 1 unexpected internal error, 2 argument misuse, 3 validation error, 4 source unavailable.
 - AC-06: JSON is the default stdout format; `--format table` renders a table; no ANSI codes appear when stdout is not a TTY or `NO_COLOR` is set.

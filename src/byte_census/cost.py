@@ -10,20 +10,12 @@ and stays `None` after merging. `CostMeter` holds the single wall-clock start;
 import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
-from types import MappingProxyType
 
-from byte_census.model import Cost
+from byte_census.model import Cost, FrozenMap, check_null_notes
 
 SUBPROCESS_READ_NOTE = (
     "Reads performed inside external commands cannot be measured from this process."
 )
-COUNTER_FIELDS = (
-    "content_bytes_read",
-    "entries_visited",
-    "subprocess_calls",
-    "subprocess_stdout_bytes",
-)
-
 Clock = Callable[[], float]
 
 
@@ -36,6 +28,14 @@ def _plus(current: int | None, amount: int) -> int | None:
     return None if current is None else current + amount
 
 
+def _sum(left: int | None, right: int | None) -> int | None:
+    return None if left is None or right is None else left + right
+
+
+def _note_items(notes: Mapping[str, str]) -> tuple[tuple[str, str], ...]:
+    return tuple(sorted(notes.items()))
+
+
 @dataclass(frozen=True)
 class CostCounters:
     """Work counters for one process; every update returns a new object."""
@@ -46,45 +46,71 @@ class CostCounters:
     subprocess_stdout_bytes: int | None = 0
     note_items: tuple[tuple[str, str], ...] = ()
 
+    def __post_init__(self) -> None:
+        check_null_notes(self.values(), self.notes)
+
     @property
     def notes(self) -> Mapping[str, str]:
-        return MappingProxyType(dict(self.note_items))
+        return FrozenMap(self.note_items)
 
-    def _add(self, name: str, amount: int) -> "CostCounters":
-        _check_amount(amount)
-        return replace(self, **{name: _plus(getattr(self, name), amount)})
+    def values(self) -> dict[str, int | None]:
+        """The counters by name."""
+        return {
+            "content_bytes_read": self.content_bytes_read,
+            "entries_visited": self.entries_visited,
+            "subprocess_calls": self.subprocess_calls,
+            "subprocess_stdout_bytes": self.subprocess_stdout_bytes,
+        }
 
     def add_content_bytes(self, amount: int) -> "CostCounters":
         """Bytes returned by byte-census's own content reads."""
-        return self._add("content_bytes_read", amount)
+        _check_amount(amount)
+        return replace(self, content_bytes_read=_plus(self.content_bytes_read, amount))
 
     def add_entries(self, amount: int) -> "CostCounters":
         """Directory entries examined (lstat or scandir entries)."""
-        return self._add("entries_visited", amount)
+        _check_amount(amount)
+        return replace(self, entries_visited=_plus(self.entries_visited, amount))
 
     def add_subprocess_call(self, stdout_bytes: int) -> "CostCounters":
         """One runner call, successful or not, with its captured stdout size."""
-        return self._add("subprocess_calls", 1)._add(
-            "subprocess_stdout_bytes", stdout_bytes
+        _check_amount(stdout_bytes)
+        return replace(
+            self,
+            subprocess_calls=_plus(self.subprocess_calls, 1),
+            subprocess_stdout_bytes=_plus(self.subprocess_stdout_bytes, stdout_bytes),
         )
 
     def unmeasured(self, name: str, note: str) -> "CostCounters":
         """Mark a counter as not measurable: null with a note, never zero."""
-        if name not in COUNTER_FIELDS:
+        if name not in _UNMEASURED:
             raise ValueError(f"unknown cost counter: {name!r}")
-        notes = {**self.notes, name: note}
-        return replace(self, **{name: None}, note_items=tuple(sorted(notes.items())))
+        return _UNMEASURED[name](self, _note_items({**self.notes, name: note}))
 
     def merge(self, other: "CostCounters") -> "CostCounters":
         """Sum two processes' counters; a null on either side stays null."""
-        values = {
-            name: None
-            if getattr(self, name) is None or getattr(other, name) is None
-            else getattr(self, name) + getattr(other, name)
-            for name in COUNTER_FIELDS
-        }
-        notes = {**other.notes, **self.notes}
-        return CostCounters(**values, note_items=tuple(sorted(notes.items())))
+        return CostCounters(
+            content_bytes_read=_sum(self.content_bytes_read, other.content_bytes_read),
+            entries_visited=_sum(self.entries_visited, other.entries_visited),
+            subprocess_calls=_sum(self.subprocess_calls, other.subprocess_calls),
+            subprocess_stdout_bytes=_sum(
+                self.subprocess_stdout_bytes, other.subprocess_stdout_bytes
+            ),
+            note_items=_note_items({**other.notes, **self.notes}),
+        )
+
+
+Notes = tuple[tuple[str, str], ...]
+_UNMEASURED: Mapping[str, Callable[[CostCounters, Notes], CostCounters]] = {
+    "content_bytes_read": lambda c, n: replace(
+        c, content_bytes_read=None, note_items=n
+    ),
+    "entries_visited": lambda c, n: replace(c, entries_visited=None, note_items=n),
+    "subprocess_calls": lambda c, n: replace(c, subprocess_calls=None, note_items=n),
+    "subprocess_stdout_bytes": lambda c, n: replace(
+        c, subprocess_stdout_bytes=None, note_items=n
+    ),
+}
 
 
 def sum_counters(parts: Iterable[CostCounters]) -> CostCounters:

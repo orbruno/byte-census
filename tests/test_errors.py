@@ -21,7 +21,9 @@ from byte_census.runner import (
     CommandLaunchError,
     CommandTimeoutError,
     ExecutableNotFoundError,
+    OutputTooLargeError,
     RejectedArgvError,
+    UntrustedExecutableError,
 )
 
 DOCKER = ("docker", "system", "df", "--format", "{{json .}}")
@@ -73,6 +75,8 @@ def test_path_validation_error_maps_to_3() -> None:
         ExecutableNotFoundError(DOCKER, "docker is not installed"),
         CommandTimeoutError(DOCKER, "docker timed out after 120 s", 120),
         CommandLaunchError(DOCKER, "docker could not start: denied"),
+        UntrustedExecutableError(DOCKER, "docker resolved to a relative path"),
+        OutputTooLargeError(DOCKER, "stdout", 16),
     ],
 )
 def test_runner_unavailability_maps_to_4(source: Exception) -> None:
@@ -156,3 +160,37 @@ def test_module_exports_exit_code_table() -> None:
         "validation_error": 3,
         "source_unavailable": 4,
     }
+
+
+class OddSignatureError(SourceUnavailableError):
+    def __init__(self, only: str) -> None:
+        super().__init__("odd " + only, "r", "s")
+
+
+def test_with_help_copies_without_calling_init() -> None:
+    original = OddSignatureError("x")
+
+    copy = original.with_help("byte-census docker scan --help")
+
+    assert type(copy) is OddSignatureError
+    assert copy is not original
+    assert original.help is None
+    assert copy.help == "byte-census docker scan --help"
+    assert (copy.error, copy.reason, copy.suggestion) == ("odd x", "r", "s")
+    assert copy.exit_code == 4
+    assert str(copy) == str(original)
+
+
+def test_with_help_keeps_an_existing_help() -> None:
+    original = ValidationError("w", "r", "s", help="mine --help")
+
+    assert original.with_help("other --help") is original
+
+
+def test_usage_error_for_path_builds_the_message() -> None:
+    error = errors.usage_error(
+        "byte-census disk map", "Option '--top' requires an argument."
+    )
+
+    assert error.info().help == "byte-census disk map --help"
+    assert error.error == "byte-census disk map was called with invalid arguments"

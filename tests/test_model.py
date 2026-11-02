@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import pickle
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from byte_census.model import (
     Envelope,
     ErrorInfo,
     Finding,
+    FrozenMap,
     Meta,
     Scope,
     ScopeRoot,
@@ -26,12 +28,14 @@ from byte_census.model import (
     derive_status,
     finding_id,
     format_captured_at,
+    freeze,
     link_references,
     order_coverage,
     order_findings_by_size,
     order_roots,
     order_suggestions,
     order_unavailable,
+    thaw,
 )
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "docs" / "contracts" / "examples"
@@ -397,3 +401,63 @@ def test_examples_cross_links_are_already_ordered(name: str) -> None:
 
     assert findings == data.findings
     assert suggestions == data.suggestions
+
+
+def _sample_envelope() -> Envelope:
+    return envelope_from(load("duplicates-scan"))
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: Finding("x", "k", "/t", details={"files": [{"path": "/a"}]}),
+        lambda: Scope(roots=(ScopeRoot("/a", "a", 1),), options={"top": 30}),
+        lambda: Cost(0.1, 0, 0, 1, 0, None, {"subprocess_content_bytes_read": "n"}),
+        _sample_envelope,
+    ],
+)
+def test_model_objects_pickle_round_trip_and_hash(build: Any) -> None:
+    obj = build()
+
+    copy = pickle.loads(pickle.dumps(obj))
+
+    assert copy == obj
+    assert hash(copy) == hash(obj)
+    assert copy.to_dict() == obj.to_dict()
+
+
+def test_equal_objects_hash_equal_and_work_in_sets() -> None:
+    first = Finding("x", "k", "/t", details={"a": 1, "b": [1, 2]})
+    second = Finding("x", "k", "/t", details={"a": 1, "b": [1, 2]})
+
+    assert len({first, second}) == 1
+
+
+def test_frozen_map_behaves_like_a_read_only_mapping() -> None:
+    frozen = freeze({"b": 2, "a": {"c": [1]}})
+
+    assert isinstance(frozen, FrozenMap)
+    assert frozen == {"b": 2, "a": {"c": (1,)}}
+    assert thaw(frozen) == {"b": 2, "a": {"c": [1]}}
+    assert list(frozen) == ["b", "a"]
+    assert frozen["a"]["c"] == (1,)
+    assert len(frozen) == 2
+    assert frozen.get("missing") is None
+    with pytest.raises(KeyError):
+        frozen["missing"]
+    with pytest.raises(TypeError):
+        frozen["b"] = 3  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [{1, 2}, frozenset({1}), b"bytes", object(), {1: "non-string key"}, 1j],
+)
+def test_freeze_rejects_non_json_values(value: Any) -> None:
+    with pytest.raises(TypeError):
+        freeze({"key": value})
+
+
+def test_finding_rejects_non_json_details() -> None:
+    with pytest.raises(TypeError):
+        Finding("x", "k", "/t", details={"s": {1, 2}})
