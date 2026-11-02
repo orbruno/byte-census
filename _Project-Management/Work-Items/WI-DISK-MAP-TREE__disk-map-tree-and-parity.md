@@ -33,8 +33,8 @@ The disk map supplies the depth-limited folder tree the experiment preview uses,
 ## Acceptance Criteria
 
 - AC-01: A depth-limited folder tree with a minimum size is reported as the parity matrix specifies.
-- AC-02: Parity is checked against committed golden output produced once by storage-inventory.sh on a fixture tree, with provenance recorded and normalized before freezing: home and absolute paths replaced by placeholders, machine-specific df, diskutil, and snapshot values replaced, and em dashes removed.
-- AC-03: Automated tests never execute storage-inventory.sh.
+- AC-02: Parity is checked against committed golden output produced once on a fixture tree (storage-inventory.sh for first-level sizes, large files and categories; the experiment preview's `du -k -d 4` for the folder tree), with provenance recorded and normalized before freezing: home and absolute paths replaced by placeholders, machine-specific df, diskutil, and snapshot values replaced, and em dashes removed.
+- AC-03: Automated tests never execute storage-inventory.sh, the experiment preview, or `du`.
 
 ## Verification
 

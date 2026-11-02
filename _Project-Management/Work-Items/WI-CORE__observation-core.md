@@ -51,6 +51,7 @@ Out of scope:
 - AC-05: Exit codes are 0 success (including partial coverage, reported in `meta`), 1 unexpected internal error, 2 argument misuse, 3 validation error, 4 source unavailable.
 - AC-06: JSON is the default stdout format; `--format table` renders a table; no ANSI codes appear when stdout is not a TTY or `NO_COLOR` is set.
 - AC-07: The CLI never prompts; every option has a flag form.
+- AC-08: The snapshot helper from WI-QUALITY is extended to the real envelope: it normalizes `meta.scope.roots[].st_dev` and the path-derived ID fields (`id`, `finding_ids`, `suggestion_ids`) so snapshots are stable across machines.
 
 ## Dependencies and Risks
 

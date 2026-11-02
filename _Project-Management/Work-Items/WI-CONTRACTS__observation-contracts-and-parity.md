@@ -15,7 +15,8 @@ definition_of_done:
 dependencies: 
   - WI-ADR-PYTHON
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../docs/contracts/README.md
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -51,7 +52,10 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- [docs/contracts/](../../docs/contracts/README.md), written 2026-11-02: AC-01, AC-02, AC-05, AC-07 in quantities.md; AC-03 envelope.md and examples/ (six JSON files, all parse); AC-04 record-mapping.md (schema pinned by SHA-256); AC-06 argv-allowlist.md; AC-08 legacy-exit-codes.md; AC-09 parity-matrix.md; AC-10 adr-002-compliance.md.
+- Orchestrator corrections 2026-11-02: `--scan-root` stays required (no default traversal); dupfind keeps the v1 scanner instead of the new engine, honoring the frozen-adapter decision.
+- Independent review: pending.
+- Closure: held open until the first CI run with the coverage gate and guard is green.
 
 ---
 Last Updated: 2026-11-02

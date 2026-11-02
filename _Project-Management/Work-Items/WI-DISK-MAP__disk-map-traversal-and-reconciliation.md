@@ -43,7 +43,7 @@ Out of scope:
 
 ## Acceptance Criteria
 
-- AC-01: `byte-census disk map --scan-root PATH` (repeatable) reports root totals, first-level sizes (`--top`, default 30), and large files (`--large-file-min`, default 500 MB).
+- AC-01: `byte-census disk map --scan-root PATH` (required, repeatable; no default traversal) reports root totals, first-level sizes (`--top`, default 30), and large files (`--large-file-min`, default 500 MB).
 - AC-02: Scan roots are canonicalized and must resolve to the data volume (`/System/Volumes/Data`); firmlinked paths such as `/Users` map to their data-volume form; roots on other volumes exit 3; descent never crosses an `st_dev` change.
 - AC-03: Nested roots are reported but not summed; hard links are deduplicated globally; complete totals are computed before display truncation; order is deterministic.
 - AC-04: Reconciliation reports a signed delta against `df -k /System/Volumes/Data`; a negative delta is flagged as overcount, not clamped to zero.

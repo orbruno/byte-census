@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: dashboard
-source_fingerprint: sha256:6205119e57664949c37f63436c8d11f6fbc5692741e8bfd65f973f22a288ad0b
+source_fingerprint: sha256:fc1be39e6038be6a038533decc62287f102b3fa385f42af44843d8c0f544295c
 ---
 
 # Project Management Dashboard - duplicate-finder-cli
@@ -17,9 +17,9 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 ## Overall Progress
 
 - Completed estimated points: 0
-- Total included estimated points: 63
-- Remaining estimated points: 63
-- Estimated progress: 0 / 63 (0%)
+- Total included estimated points: 62
+- Remaining estimated points: 62
+- Estimated progress: 0 / 62 (0%)
 - Unestimated active Work Items: 5
 
 ## Delivery Summary
@@ -27,7 +27,7 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 - Effective active Work Items: 24
 - Completed Work Items: 0
 - Excluded Work Items: 0
-- Estimated active points: 63
+- Estimated active points: 62
 - Completed points: 0
 - Unestimated active Work Items: 5
 - Estimate coverage: 19/24 active items
@@ -50,7 +50,7 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 | [WI-CORE](Work-Items/WI-CORE__observation-core.md) | enabler | - | Provide the observation model, cost meter, errors, and rendering | A | 6 | 8 | proposed |
 | [WI-SUGGESTIONS](Work-Items/WI-SUGGESTIONS__risk-ordered-suggestions.md) | story | - | Provide the risk-ordered cleanup suggestion catalog | A | 7 | 2 | proposed |
 | [WI-DUPLICATES](Work-Items/WI-DUPLICATES__duplicates-scan.md) | story | - | Find duplicates with size, partial-hash, and full-hash stages | A | 8 | 5 | proposed |
-| [WI-LEGACY-ADAPTER](Work-Items/WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md) | enabler | - | Keep dupfind as a frozen v1 adapter over the new engine | A | 9 | 3 | proposed |
+| [WI-LEGACY-ADAPTER](Work-Items/WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md) | enabler | - | Keep dupfind as a frozen v1 command with safe report output | A | 9 | 2 | proposed |
 | [WI-ARTIFACTS](Work-Items/WI-ARTIFACTS__artifacts-scan.md) | story | - | Report regenerable development artifacts | B | 1 | 3 | proposed |
 | [WI-CACHES](Work-Items/WI-CACHES__caches-scan.md) | story | - | Report the largest user and tool caches | B | 2 | 3 | proposed |
 | [WI-DOCKER](Work-Items/WI-DOCKER__docker-scan.md) | story | - | Report Docker disk usage, images, and stopped containers | B | 3 | 3 | proposed |
