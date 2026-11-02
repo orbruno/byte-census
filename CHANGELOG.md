@@ -4,6 +4,10 @@ All notable changes to this project are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- `artifacts scan` discovery lists directories through the shared safe lister.
+
 ### Added
 
 - `byte-census docker scan` rejects unusable `docker system df` output (exit 4) and reports unparseable fields as null with a partial status; totals are null when any component is unknown.
