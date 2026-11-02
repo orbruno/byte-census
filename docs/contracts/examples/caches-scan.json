@@ -185,7 +185,7 @@
       {
         "source": "npm",
         "reason": "not_installed",
-        "detail": "npm was not found on PATH; its cache was not measured."
+        "detail": "/Users/example/.npm does not exist (npm cache location from default); nothing was measured."
       }
     ]
   }

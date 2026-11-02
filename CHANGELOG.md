@@ -48,6 +48,10 @@ All notable changes to this project are recorded here.
   reject a kept path listed for removal, `FrozenMap` hashes independent of key
   order, and `freeze` rejects NaN and infinite floats.
 - `byte-census duplicates scan PATH`: duplicate groups found by size, a 64 KiB partial SHA-256, and a full SHA-256 only for partial matches, with hard links merged, `reclaimable_estimate_bytes` from allocated blocks, exact `content_bytes_read`, `--compare`, `--min-size`, and `--recursive/--no-recursive`.
+- `byte-census caches scan`: complete allocated totals for every folder in
+  `~/Library/Caches` plus the uv, npm, and Homebrew caches outside it, cut to
+  `--top` (default 20) only after measuring; a missing tool is an
+  `unavailable_sources` entry, and tool caches carry low-risk catalog suggestions.
 - Cleanup suggestion catalog (`byte_census.suggestions`): nine immutable entries
   (docker, uv, brew, npm, artifact, duplicate) with risk, reversibility, and
   reason, pure builders for check-wide and per-finding suggestions, and the

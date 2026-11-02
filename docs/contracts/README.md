@@ -24,7 +24,7 @@ byte-census is a deterministic, read-only macOS storage CLI with five commands: 
 | File | Command | Shows |
 |---|---|---|
 | [docker-scan.json](examples/docker-scan.json) | `byte-census docker scan` | Docker-reported figures with null host bytes, image inventory, stopped containers, four risk-ordered suggestions, `status: complete` |
-| [caches-scan.json](examples/caches-scan.json) | `byte-census caches scan` | Cache folders and a tool cache outside `~/Library/Caches`, a privacy denial, npm `not_installed` |
+| [caches-scan.json](examples/caches-scan.json) | `byte-census caches scan` | Cache folders and a tool cache outside `~/Library/Caches`, a privacy denial, npm resolved from configuration (default `~/.npm`, not present, `not_installed`) |
 | [artifacts-scan.json](examples/artifacts-scan.json) | `byte-census artifacts scan ~/Projects` | Two artifacts with regeneration commands and per-finding suggestions, a permission denial |
 | [duplicates-scan.json](examples/duplicates-scan.json) | `byte-census duplicates scan ~/Downloads` | One group with a merged hard link, `content_bytes_read`, a dataless file and a changed file |
 | [disk-map.json](examples/disk-map.json) | `byte-census disk map --scan-root "$HOME/Library/Application Support" --scan-root ~/Library/Developer/Xcode` | Two roots; a category equal to a root, one inside a root, one enclosing a root (contributes only its remainder, with a merged hard link), and a tool cache inside a category; `reconciliation.contributions` summing to `measured_allocated_bytes`; signed delta, system context, tree, a skipped mount, empty suggestions |
