@@ -155,6 +155,16 @@ class DuplicateFinderTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 2)
         self.assertIn("not in the range", result.stderr)
 
+    def test_usage_error_hint_names_long_help_option(self) -> None:
+        self.write_file("usage/file.txt", b"content")
+
+        result = self.runner.invoke(
+            find, ["-X", str(self.root / "usage")], prog_name="dupfind"
+        )
+
+        self.assertEqual(result.exit_code, 2)
+        self.assertIn("Try 'dupfind --help' for help.", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

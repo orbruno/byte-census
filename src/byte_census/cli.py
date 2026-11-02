@@ -6,7 +6,7 @@ from byte_census import __version__
 
 
 @click.group(
-    context_settings={"help_option_names": ["-h", "--help"]},
+    context_settings={"help_option_names": ["--help", "-h"]},
     invoke_without_command=True,
 )
 @click.version_option(

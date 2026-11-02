@@ -65,6 +65,23 @@ def group_files_by_size(files: list[Path]) -> tuple[dict[int, list[Path]], list[
     return dict(size_groups), errors
 
 
+def _repeated_size_candidates(size_groups: dict[int, list[Path]]) -> list[Path]:
+    """Return sorted files whose size is shared with at least one other file."""
+    return sorted(
+        file_path
+        for same_size_files in size_groups.values()
+        if len(same_size_files) > 1
+        for file_path in same_size_files
+    )
+
+
+def _common_size_candidates(
+    size_groups: dict[int, list[Path]], common_sizes: set[int]
+) -> list[Path]:
+    """Return sorted files from one directory whose size appears in both."""
+    return sorted(file_path for size in common_sizes for file_path in size_groups[size])
+
+
 def find_duplicates_single(
     path: Path,
     recursive: bool = True,
@@ -85,21 +102,13 @@ def find_duplicates_single(
         duplicates_dict: {hash: [file_paths]} for files with duplicates
         errors_list: List of error messages for files that couldn't be processed
     """
-    hash_map: defaultdict[str, list[Path]] = defaultdict(list)
-
-    # Collect files
     files = collect_files(path, recursive, min_size)
 
     if not files:
         return {}, [], 0
 
     size_groups, errors = group_files_by_size(files)
-    candidates = sorted(
-        file_path
-        for same_size_files in size_groups.values()
-        if len(same_size_files) > 1
-        for file_path in same_size_files
-    )
+    candidates = _repeated_size_candidates(size_groups)
 
     file_iterator = (
         track(candidates, description="Hashing files...", console=status_console)
@@ -107,13 +116,12 @@ def find_duplicates_single(
         else candidates
     )
 
+    hash_map: defaultdict[str, list[Path]] = defaultdict(list)
     for file_path in file_iterator:
         try:
-            file_hash = calculate_hash(file_path)
-            hash_map[file_hash].append(file_path)
+            hash_map[calculate_hash(file_path)].append(file_path)
         except OSError as e:
             errors.append(str(e))
-            continue
 
     # Filter to only duplicates (hashes with >1 file)
     duplicates = {h: paths for h, paths in hash_map.items() if len(paths) > 1}
@@ -181,12 +189,8 @@ def find_duplicates_compare(
     errors = errors1 + errors2
 
     common_sizes = set(size_groups1) & set(size_groups2)
-    candidates1 = sorted(
-        file_path for size in common_sizes for file_path in size_groups1[size]
-    )
-    candidates2 = sorted(
-        file_path for size in common_sizes for file_path in size_groups2[size]
-    )
+    candidates1 = _common_size_candidates(size_groups1, common_sizes)
+    candidates2 = _common_size_candidates(size_groups2, common_sizes)
 
     hash_map1, hash_errors1 = _hash_candidates(
         candidates1, path1, "Hashing directory 1...", quiet

@@ -6,6 +6,7 @@ import click
 
 from byte_census.legacy.consoles import console, status_console
 from byte_census.legacy.formatting import (
+    DuplicateStats,
     calculate_statistics,
     format_csv_output,
     format_json_output,
@@ -13,22 +14,37 @@ from byte_census.legacy.formatting import (
     format_table_text,
 )
 from byte_census.legacy.report_writer import write_report
-from byte_census.legacy.scan import (
-    collect_files,
-    find_duplicates_compare,
-    find_duplicates_single,
+from byte_census.legacy.scan import find_duplicates_compare, find_duplicates_single
+
+EXAMPLES = """\
+Example:
+
+\b
+  # Find duplicates in current directory
+  dupfind .
+
+\b
+  # Find duplicates in Downloads (non-recursive)
+  dupfind ~/Downloads --no-recursive
+
+\b
+  # Compare two directories
+  dupfind /path/dir1 --compare /path/dir2
+
+\b
+  # Output as JSON to file
+  dupfind /path --format json --output results.json
+
+\b
+  # Ignore files smaller than 1MB
+  dupfind /path --min-size 1048576
+"""
+
+
+@click.command(
+    context_settings={"help_option_names": ["--help", "-h"]},
+    epilog=EXAMPLES,
 )
-
-__all__ = [
-    "cli",
-    "collect_files",
-    "find",
-    "find_duplicates_compare",
-    "find_duplicates_single",
-]
-
-
-@click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument("path", type=click.Path(exists=True, path_type=Path))
 @click.option(
     "--compare",
@@ -78,28 +94,6 @@ def find(
     Find duplicate files using cryptographic hashing.
 
     PATH is the directory to scan for duplicates.
-
-    Example:
-
-      \b
-      # Find duplicates in current directory
-      dupfind .
-
-      \b
-      # Find duplicates in Downloads (non-recursive)
-      dupfind ~/Downloads --no-recursive
-
-      \b
-      # Compare two directories
-      dupfind /path/dir1 --compare /path/dir2
-
-      \b
-      # Output as JSON to file
-      dupfind /path --format json --output results.json
-
-      \b
-      # Ignore files smaller than 1MB
-      dupfind /path --min-size 1048576
     """
     try:
         if compare:
@@ -125,7 +119,12 @@ def find(
         raise click.ClickException(str(e)) from e
 
 
-def _render(duplicates, stats, output_format: str, output: Path | None) -> str | None:
+def _render(
+    duplicates: dict[str, list[Path]],
+    stats: DuplicateStats,
+    output_format: str,
+    output: Path | None,
+) -> str | None:
     """Render results; table output to stdout is printed directly and returns None."""
     if output_format == "table":
         if output:

@@ -27,4 +27,4 @@ def calculate_hash(file_path: Path, algorithm: str = "sha256") -> str:
                 hash_func.update(chunk)
         return hash_func.hexdigest()
     except (OSError, PermissionError) as e:
-        raise OSError(f"Cannot read file {file_path}: {e}")
+        raise OSError(f"Cannot read file {file_path}: {e}") from e

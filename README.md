@@ -170,19 +170,35 @@ Usage: dupfind [OPTIONS] PATH
 
   PATH is the directory to scan for duplicates.
 
+Options:
+  -c, --compare PATH              Compare with another directory to find
+                                  duplicates between them
+  -r, --recursive / -R, --no-recursive
+                                  Search recursively in subdirectories
+                                  (default: recursive)
+  -f, --format [table|json|csv]   Output format (default: table)
+  -o, --output PATH               Save results to file instead of stdout
+  --min-size INTEGER RANGE        Minimum file size in bytes to consider
+                                  (default: 0)  [x>=0]
+  -q, --quiet                     Suppress progress output, only show results
+  -h, --help                      Show this message and exit.
+
   Example:
 
-      dupfind . --format json
+    # Find duplicates in current directory
+    dupfind .
 
-Options:
-  -c, --compare PATH              Compare with another directory
-  -r, --recursive / -R, --no-recursive
-                                  Search recursively (default: recursive)
-  -f, --format [table|json|csv]   Output format (default: table)
-  -o, --output PATH               Save results to file
-  --min-size INTEGER              Minimum file size in bytes (default: 0)
-  -q, --quiet                     Suppress progress output
-  -h, --help                      Show this message and exit
+    # Find duplicates in Downloads (non-recursive)
+    dupfind ~/Downloads --no-recursive
+
+    # Compare two directories
+    dupfind /path/dir1 --compare /path/dir2
+
+    # Output as JSON to file
+    dupfind /path --format json --output results.json
+
+    # Ignore files smaller than 1MB
+    dupfind /path --min-size 1048576
 ```
 
 ## How It Works
