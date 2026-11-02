@@ -8,9 +8,8 @@ anything: no suggestion string reaches the runner (WI-SUGGESTIONS AC-04).
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from types import MappingProxyType
 
-from byte_census.model import RISKS, Suggestion, order_suggestions
+from byte_census.model import RISKS, FrozenMap, Suggestion, order_suggestions
 
 __all__ = [
     "CATALOG",
@@ -113,8 +112,8 @@ _ENTRIES = (
     ),
 )
 
-CATALOG: Mapping[str, SuggestionTemplate] = MappingProxyType(
-    {entry.id: entry for entry in _ENTRIES}
+CATALOG: Mapping[str, SuggestionTemplate] = FrozenMap(
+    tuple((entry.id, entry) for entry in _ENTRIES)
 )
 
 
