@@ -8,14 +8,15 @@ profile: compact
 title: "Measure and adopt process-parallel traversal if it pays off"
 parent: null
 points: 3
-status: proposed
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
   - WI-DISK-MAP-TREE
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../docs/benchmarks/2026-11-02-parallel-walk/results.md
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -44,7 +45,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- [Benchmark results](../../docs/benchmarks/2026-11-02-parallel-walk/results.md), 2026-11-02, warm ~/Documents (about 2.29 million entries), median of three runs: single 80.46 s; one process per first-level child 1.03 to 1.07 times faster (fails AC-02's 1.5 times); an eight-worker split at depth three 2.56 times faster (30.34 s). Entries, allocated bytes, linked inodes and errors agree exactly on static trees in every mode.
+- Decision (AC-03): no production change in this item. The per-child design specified here does not pay off; adaptive splitting does, and is scheduled as WI-PARALLEL-ADAPTIVE. The ADR-001 Rust revisit trigger is not met, because Python processes reach the target.
 
 ---
 Last Updated: 2026-11-02

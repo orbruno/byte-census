@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: manual-audits
-source_fingerprint: sha256:d8ebc6b6b9a524f4d80c2a074f3edf71f9d8085cee7533836e5bc014e0a7620f
+source_fingerprint: sha256:c5a319b7949f7467505e3ac9a304c3943521ad720eee36c6859ff43caf61346e
 ---
 
 # Manual Audits

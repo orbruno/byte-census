@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: work-items
-source_fingerprint: sha256:d8ebc6b6b9a524f4d80c2a074f3edf71f9d8085cee7533836e5bc014e0a7620f
+source_fingerprint: sha256:c5a319b7949f7467505e3ac9a304c3943521ad720eee36c6859ff43caf61346e
 ---
 
 # Work Items
@@ -31,6 +31,7 @@ Index canonical Work Item records with their kind and derived Epic context witho
 - [WI-FSREAD-SPLIT - enabler - standalone](WI-FSREAD-SPLIT__split-fsread-and-drop-anchored-path.md)
 - [WI-LEGACY-ADAPTER - enabler - standalone](WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md)
 - [WI-LEGACY-REMOVAL - enabler - standalone](WI-LEGACY-REMOVAL__remove-dupfind-adapter.md)
+- [WI-PARALLEL-ADAPTIVE - enabler - standalone](WI-PARALLEL-ADAPTIVE__adaptive-parallel-traversal.md)
 - [WI-PARALLEL-WALK - enabler - standalone](WI-PARALLEL-WALK__parallel-traversal.md)
 - [WI-PREVIEW-CALLER - enabler - standalone](WI-PREVIEW-CALLER__experiment-preview-caller.md)
 - [WI-QUALITY - enabler - standalone](WI-QUALITY__quality-infrastructure.md)
