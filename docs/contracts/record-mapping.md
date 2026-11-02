@@ -49,22 +49,40 @@ Findings without any byte measure are not mapped. Mapped Docker findings keep th
 | `operation.scope.exclusions` | `meta.scope.skipped_mounts`. |
 | `operation.scope.incomplete` | `meta.incomplete_coverage[].path`, plus `unavailable_sources[].source` with reason `failed` or `timed_out`. |
 | `operation.purpose`, `platform`, `operator`, `device` | Not produced by byte-census; supplied by the operator. |
-| `baseline[]` | From disk map `data.system`: one item each for `df -k /System/Volumes/Data`, `df -k /`, `diskutil info /`, and `tmutil listlocalsnapshots /`, with `measured_at` = `meta.captured_at`, `command` = the argv joined by spaces, and `observation` a one-line summary in bytes. |
+| `baseline[]` | From disk map `data.system`, one item per source that returned a value, in this order: `df -k /System/Volumes/Data`, `df -k /`, `diskutil info /`, `tmutil listlocalsnapshots /`. `measured_at` = `meta.captured_at`, `command` = the argv joined by spaces, `observation` = a one-line summary in bytes. |
 | `decision_queue` | `[]`. |
+
+Unavailable baseline sources. Decision: the data-volume `df` is always present when disk map succeeded, because disk map exits 4 without it. An optional source (`df -k /`, `diskutil`, `tmutil`) that is unavailable is omitted from `baseline`, never represented by a placeholder item. If its `unavailable_sources` reason is `failed` or `timed_out`, it appears in `operation.scope.incomplete` as `source:<name>`; if the reason is `not_installed`, it is omitted entirely. A record built without a disk map result has `baseline: []`, which the schema allows.
+
+Combining commands. Decision: a record may combine several command results. `scope.roots`, `exclusions`, and `incomplete` are sorted unions without duplicates; findings follow command order (`docker scan`, `caches scan`, `artifacts scan`, `duplicates scan`, `disk map`) and then each result's own finding order. Finding IDs do not collide across commands because each command has its own prefix.
 
 Decision: suggestions are not converted into `decision_queue` items automatically. The record requires an expected benefit, a recovery path, and a verification plan per item, which are human judgments; this keeps the queue empty by design, as storage-inventory.sh did. When an operator adds an item by hand, the suggestion supplies: `proposed_action` = "Proposal: " + `command`; `finding_id` = one of `finding_ids`; `reversibility` = `reversible` when `reversible` is true, else `irreversible`; `authorization.required` = `true`, `approved_by` = `""`.
 
 ## Validation evidence
 
-Validation against the record schema is a local check, because the schema is not part of this repository. It runs where the schema file is present, and its result is recorded as evidence in the Work Item that implements the mapping:
+Validation against the record schema is a local check, because the schema is not part of this repository. CI does not run it.
+
+Representative record: [examples/mapped-record.example.json](examples/mapped-record.example.json), built by applying this mapping to all five command examples (32 findings, 4 baseline items; `purpose`, `platform`, and `operator` are placeholders an operator would supply).
+
+Command (the schema file is read-only input; `SCHEMA.yaml` is its local path):
 
 ```sh
+shasum -a 256 SCHEMA.yaml
 uv run --no-project --with jsonschema --with pyyaml python -I -c \
-  "import json,sys,yaml,jsonschema; jsonschema.Draft202012Validator(yaml.safe_load(open(sys.argv[2]))).validate(json.load(open(sys.argv[1])))" \
-  RECORD.json SCHEMA.yaml
+  "import json,sys,yaml,jsonschema; jsonschema.Draft202012Validator(yaml.safe_load(open(sys.argv[2]))).validate(json.load(open(sys.argv[1]))); print('valid')" \
+  docs/contracts/examples/mapped-record.example.json SCHEMA.yaml
 ```
 
-The evidence entry names the schema SHA-256 above, the byte-census version, the command, and the validator's result. CI does not run this check.
+Evidence, 2026-11-02:
+
+| Item | Result |
+|---|---|
+| Schema SHA-256 | `33ce86462a5eb9ee722e459f4fc3774c09b4c28f07ec6d8f6d873c84ce478b07`, matches the pin above |
+| Validator | jsonschema 4.26.0, Draft 2020-12, with PyYAML 6.0.3 |
+| Result | Pass: printed `valid`, exit 0, no errors and no fixes needed |
+| Negative control | Same record with one `status` set to `stale` and one `size_kb` removed: the validator reported `'size_kb' is a required property` and `'stale' is not one of [...]`, so the check rejects invalid records |
+
+Rerun this check whenever this mapping, the examples, or the schema hash changes, and record the new result here.
 
 ---
 

@@ -90,7 +90,6 @@
         ],
         "see_check": null,
         "suggestion_ids": [
-          "docker-system-prune-all",
           "docker-volume-prune"
         ],
         "classification": {
@@ -217,12 +216,11 @@
         "risk": "high",
         "reversible": false,
         "requires_owner_authorization": true,
-        "reason": "Removes every unused image, stopped container, network, and build cache entry.",
+        "reason": "Removes every unused image, stopped container, network, and build cache entry; volumes are kept because the command has no --volumes.",
         "finding_ids": [
           "dkr-68daff3e0fe9",
-          "dkr-b05a7a1ed8cb",
-          "dkr-c2f5278d487a",
-          "dkr-f589cbd2fea2"
+          "dkr-f589cbd2fea2",
+          "dkr-b05a7a1ed8cb"
         ]
       },
       {

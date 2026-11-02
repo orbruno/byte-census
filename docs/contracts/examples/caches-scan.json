@@ -147,13 +147,13 @@
     "scope": {
       "roots": [
         {
-          "path": "/Users/example/Library/Caches",
-          "given": "~/Library/Caches",
+          "path": "/Users/example/.cache/uv",
+          "given": "uv cache dir",
           "st_dev": 16777234
         },
         {
-          "path": "/Users/example/.cache/uv",
-          "given": "uv cache dir",
+          "path": "/Users/example/Library/Caches",
+          "given": "~/Library/Caches",
           "st_dev": 16777234
         }
       ],

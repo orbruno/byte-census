@@ -1,0 +1,439 @@
+{
+  "operation": {
+    "purpose": "Example: observe storage use before deciding on any cleanup.",
+    "date": "2026-11-02",
+    "platform": "macOS (example)",
+    "operator": "example",
+    "observation_only": true,
+    "scope": {
+      "roots": [
+        "/System/Volumes/Data/Users/example/Library/Application Support",
+        "/System/Volumes/Data/Users/example/Library/Developer/Xcode",
+        "/Users/example/.cache/uv",
+        "/Users/example/Downloads",
+        "/Users/example/Library/Caches",
+        "/Users/example/Projects"
+      ],
+      "exclusions": [
+        "/System/Volumes/Data/Users/example/Library/Developer/Xcode/Archives/mounted-image"
+      ],
+      "incomplete": [
+        "/System/Volumes/Data/Users/example/Library/Mail",
+        "/System/Volumes/Data/Users/example/Library/Messages",
+        "/Users/example/Downloads/iCloud Export/notes.zip",
+        "/Users/example/Downloads/video-render.mov",
+        "/Users/example/Library/Caches/com.apple.HomeKit",
+        "/Users/example/Projects/legacy/private"
+      ]
+    }
+  },
+  "baseline": [
+    {
+      "measured_at": "2026-11-02T09:30:00Z",
+      "command": "df -k /System/Volumes/Data",
+      "observation": "used 319910813696 bytes of 994662584320 bytes, 657308332032 bytes available"
+    },
+    {
+      "measured_at": "2026-11-02T09:30:00Z",
+      "command": "df -k /",
+      "observation": "system volume used 12015828992 bytes"
+    },
+    {
+      "measured_at": "2026-11-02T09:30:00Z",
+      "command": "diskutil info /",
+      "observation": "volume Macintosh HD, APFS, container total 994.7 GB (994662584320 Bytes), container free 350.1 GB (350108332032 Bytes)"
+    },
+    {
+      "measured_at": "2026-11-02T09:30:00Z",
+      "command": "tmutil listlocalsnapshots /",
+      "observation": "2 local snapshots present; sizes not attributed"
+    }
+  ],
+  "findings": [
+    {
+      "id": "dkr-68daff3e0fe9",
+      "target": "docker:Images",
+      "size_kb": 7246094,
+      "measured_with": "byte-census 2.0.0 docker scan (docker_reported_size_bytes)",
+      "owner": "docker",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind docker_type; caveats docker_reported_not_host; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "dkr-f589cbd2fea2",
+      "target": "docker:Containers",
+      "size_kb": 180274,
+      "measured_with": "byte-census 2.0.0 docker scan (docker_reported_size_bytes)",
+      "owner": "docker",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind docker_type; caveats docker_reported_not_host; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "dkr-c2f5278d487a",
+      "target": "docker:Local Volumes",
+      "size_kb": 2255860,
+      "measured_with": "byte-census 2.0.0 docker scan (docker_reported_size_bytes)",
+      "owner": "docker",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind docker_type; caveats docker_reported_not_host; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "dkr-b05a7a1ed8cb",
+      "target": "docker:Build Cache",
+      "size_kb": 1826172,
+      "measured_with": "byte-census 2.0.0 docker scan (docker_reported_size_bytes)",
+      "owner": "docker",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind docker_type; caveats docker_reported_not_host; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "cch-601a44f92b4a",
+      "target": "/Users/example/.cache/uv",
+      "size_kb": 9679904,
+      "measured_with": "byte-census 2.0.0 caches scan (allocated_bytes)",
+      "owner": "uv",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind tool_cache; caveats apfs_clone_or_shared_extent; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "cch-df0cc54e92ba",
+      "target": "/Users/example/Library/Caches/Homebrew",
+      "size_kb": 3067768,
+      "measured_with": "byte-census 2.0.0 caches scan (allocated_bytes)",
+      "owner": "brew",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind cache_dir; caveats apfs_clone_or_shared_extent; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "cch-8eb49d686277",
+      "target": "/Users/example/Library/Caches/com.spotify.client",
+      "size_kb": 2155248,
+      "measured_with": "byte-census 2.0.0 caches scan (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind cache_dir; caveats apfs_clone_or_shared_extent; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "cch-8aa463bbcc07",
+      "target": "/Users/example/Library/Caches/Google",
+      "size_kb": 986868,
+      "measured_with": "byte-census 2.0.0 caches scan (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind cache_dir; caveats apfs_clone_or_shared_extent; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "art-e164e4cf9b16",
+      "target": "/Users/example/Projects/web-app/node_modules",
+      "size_kb": 604208,
+      "measured_with": "byte-census 2.0.0 artifacts scan (allocated_bytes)",
+      "owner": "/Users/example/Projects/web-app",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind artifact; caveats apfs_clone_or_shared_extent; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "art-2536ebd8bc61",
+      "target": "/Users/example/Projects/api/.venv",
+      "size_kb": 326504,
+      "measured_with": "byte-census 2.0.0 artifacts scan (allocated_bytes)",
+      "owner": "/Users/example/Projects/api",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind artifact; caveats apfs_clone_or_shared_extent; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "dup-64731b5cc4fd",
+      "target": "sha256:49a4e69a0038aaab493b9605d21d7add1df8519e18d76c621fa0d6f9e98eb35b",
+      "size_kb": 4888,
+      "measured_with": "byte-census 2.0.0 duplicates scan (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind duplicate_group; caveats apfs_clone_or_shared_extent, hard_links_merged; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-8a75c2edf593",
+      "target": "/System/Volumes/Data/Users/example/Library/Application Support",
+      "size_kb": 110331176,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind root_total; caveats apfs_clone_or_shared_extent; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-d03864b23fac",
+      "target": "/System/Volumes/Data/Users/example/Library/Developer/Xcode",
+      "size_kb": 31436312,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind root_total; caveats apfs_clone_or_shared_extent; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-afb1735d61fe",
+      "target": "/System/Volumes/Data/Users/example/Library/Application Support/Steam",
+      "size_kb": 64277712,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind first_level; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-3648f729eb72",
+      "target": "/System/Volumes/Data/Users/example/Library/Application Support/MobileSync",
+      "size_kb": 40789608,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind first_level; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-160f84360950",
+      "target": "/System/Volumes/Data/Users/example/Library/Developer/Xcode/DerivedData",
+      "size_kb": 19084084,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind first_level; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-1fda433f85ff",
+      "target": "/System/Volumes/Data/Users/example/Library/Developer/Xcode/iOS DeviceSupport",
+      "size_kb": 12268340,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind first_level; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-93e3f552b82e",
+      "target": "/System/Volumes/Data/Users/example/Library/Application Support/Google",
+      "size_kb": 4823452,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind first_level; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-b691bfe7fa63",
+      "target": "/System/Volumes/Data/Users/example/Library/Application Support/Steam/steamapps/common/ExampleGame/data.pak",
+      "size_kb": 10276048,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind large_file; caveats none; see duplicates scan. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-f528e3c3a324",
+      "target": "/System/Volumes/Data/Users/example/Library/Application Support/MobileSync/Backup/0000-EXAMPLE/Manifest.db",
+      "size_kb": 943720,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind large_file; caveats none; see duplicates scan. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-3c1b6bb1df43",
+      "target": "/System/Volumes/Data/Users/example/Library/Application Support",
+      "size_kb": 110331176,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats inside_other_scope; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-718f07541d69",
+      "target": "/System/Volumes/Data/Users/example/Library/Developer",
+      "size_kb": 42970648,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats hard_links_merged; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-f45ff8c53895",
+      "target": "/System/Volumes/Data/Users/example/Library/Application Support/MobileSync/Backup",
+      "size_kb": 40475036,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats inside_other_scope; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-4a4537a870f4",
+      "target": "/System/Volumes/Data/Applications",
+      "size_kb": 40265320,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-ede4abf7b65a",
+      "target": "/System/Volumes/Data/Users/example/Library/Containers",
+      "size_kb": 33973864,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-22c6906c2de8",
+      "target": "/System/Volumes/Data/Users/example/Downloads",
+      "size_kb": 23592964,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats none; see duplicates scan. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-43a5bc6ba843",
+      "target": "/System/Volumes/Data/Users/example/Library/Caches",
+      "size_kb": 18245224,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats none; see caches scan. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-482d3cbba47e",
+      "target": "/System/Volumes/Data/Users/example/Library/Group Containers",
+      "size_kb": 9542044,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-1a43eaebc1c2",
+      "target": "/System/Volumes/Data/Users/example/Library/Mail",
+      "size_kb": 0,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-4ad63c0549fd",
+      "target": "/System/Volumes/Data/Users/example/Library/Messages",
+      "size_kb": 0,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind category; caveats none; see none. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-e6528bc18d5e",
+      "target": "/System/Volumes/Data/Users/example/.cache/uv",
+      "size_kb": 9646900,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "uv",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind tool_cache; caveats none; see caches scan. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    },
+    {
+      "id": "map-795d0e9cc605",
+      "target": "/System/Volumes/Data/Users/example/Library/Caches/Homebrew",
+      "size_kb": 3040872,
+      "measured_with": "byte-census 2.0.0 disk map (allocated_bytes)",
+      "owner": "brew",
+      "status": "unknown",
+      "recovery": "unknown",
+      "evidence": "Observed by byte-census at 2026-11-02T09:30:00Z; kind tool_cache; caveats inside_other_scope; see caches scan. Not classified.",
+      "confidence": "low",
+      "disposition": "investigate"
+    }
+  ],
+  "decision_queue": []
+}

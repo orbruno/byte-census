@@ -10,8 +10,9 @@ Every byte figure in byte-census output is an integer number of bytes. Human uni
 
 | Field | Definition | Source |
 |---|---|---|
-| `logical_bytes` | Sum of `st_size` over the regular files a finding covers. Directory and symlink `st_size` values are excluded because they do not describe content. | `lstat` |
-| `allocated_bytes` | Sum of `st_blocks x 512` over every entry a finding covers: regular files, directories (each directory's own blocks are counted, as `du` does), symlinks, and special files. | `lstat` |
+| `logical_bytes` | Displayed subtree total of `st_size` over the distinct regular-file inodes a finding covers. Directory and symlink `st_size` values are excluded because they do not describe content. | `lstat` |
+| `allocated_bytes` | Displayed subtree total of `st_blocks x 512` over the distinct inodes a finding covers: regular files, directories (each directory's own blocks are counted, as `du` does), symlinks, and special files. | `lstat` |
+| `counted_allocated_bytes` | Unique counted contribution: the allocated bytes of the inodes this finding claims first under the attribution precedence. Disk map only, in `details` of reconciliation units and in `reconciliation.contributions`. | Derived |
 | `reclaimable_estimate_bytes` | Upper-bound estimate of the allocated space a cleanup of this finding could free. It is an estimate, never a promise (see Limitations). `null` when the check makes no reclaim claim. | Derived per check |
 | `docker_reported_size_bytes` | Size as reported by the Docker CLI, converted to bytes. | `docker` output |
 | `docker_reported_reclaimable_bytes` | Reclaimable size as reported by the Docker CLI, converted to bytes. | `docker` output |
@@ -33,13 +34,30 @@ Unit rules:
 - Option values named `*_mb` use MiB (1,048,576 bytes), matching `find -size +NM` in storage-inventory.sh.
 - Decision: Docker size strings (for example `7.42GB`) are parsed with Docker's decimal base (1 GB = 1,000,000,000 bytes) and the raw string is kept in `details.raw` so the conversion is auditable.
 
-## Hard links
+## Hard links, overlap, and attribution
 
-- Identity of a file is the pair `(st_dev, st_ino)`.
-- The identity set is global to one check invocation: across all roots, all categories, all workers (WI-PARALLEL-WALK), and both sides of `--compare`.
-- The first encounter in sorted traversal order is attributed the bytes. Later encounters add 0 to `logical_bytes` and `allocated_bytes` but still count in `cost.entries_visited`.
-- Traversal order is deterministic: directory entries are visited in ascending byte order of their names, so attribution is reproducible.
-- A finding whose subtree contains a hard link attributed elsewhere carries the caveat `hard_links_merged`.
+Identity of a file is the pair `(st_dev, st_ino)`. Two quantities are kept apart:
+
+| Quantity | Field | Rule | Sums across findings? |
+|---|---|---|---|
+| Displayed subtree total | `logical_bytes`, `allocated_bytes` | Every distinct inode inside the finding's own subtree, counted once within that subtree, whatever other findings show. | No. Views may overlap (a first-level folder inside its root, a category inside or around a root, a hard link seen from two folders). |
+| Unique counted contribution | `counted_allocated_bytes` | Each inode is claimed once per check invocation, by the first claimant under the precedence below. Later claimants add 0. | Yes. Summary totals and disk map reconciliation are sums of counted contributions, which equal the allocated bytes of the union of all measured scopes. |
+
+The global identity set covers all roots, categories, tool caches, workers (WI-PARALLEL-WALK), and both sides of `--compare`. Every visit still counts in `cost.entries_visited`.
+
+Deterministic traversal: directory entries are visited in ascending byte order of their names, and claimants are processed in the precedence order below, so the same tree always gives the same attribution.
+
+Attribution precedence (disk map):
+
+1. Declared scan roots, in ascending canonical path order. A root nested inside another root is not walked again: its displayed total comes from the enclosing walk and its counted contribution is 0.
+2. Managed categories, in catalog order (parity matrix S19). A category equal to or inside a root has counted contribution 0 (`overlap`: `equals_scan_root` or `inside_scan_root`). A category that encloses one or more roots is walked without descending into those roots again; its displayed total is the union of its own entries and the enclosed roots, and its counted contribution is only the inodes not already claimed (`overlap`: `encloses_scan_root`). A category inside an earlier category contributes 0 (`inside_category`).
+3. Tool caches, in the order uv, npm, brew. A tool cache inside a root or a category contributes 0.
+
+`details.overlap` is `null` for a scope disjoint from all earlier claimants. First-level folders, large files, and tree nodes are views inside a root and never carry a counted contribution.
+
+Other checks: caches, artifacts, and duplicates findings cover disjoint subtrees (artifact discovery never descends into a found artifact; cache folders are siblings; a tool cache inside `~/Library/Caches` is reported once). Their displayed totals can overlap only through hard links. Precedence is the presentation order of the findings, and summary byte totals are sums of counted contributions, so they never double count. These checks do not expose `counted_allocated_bytes` per finding.
+
+A finding carries the caveat `hard_links_merged` when one of its inodes has another name, inside the finding or in another finding, and was therefore counted once.
 
 ## Volume boundary
 
@@ -70,10 +88,10 @@ Docker figures are informational. They describe space inside Docker's own storag
 | Code | Meaning |
 |---|---|
 | `apfs_clone_or_shared_extent` | Allocated bytes may be shared; removal may free less. |
-| `hard_links_merged` | At least one hard-linked name was attributed once only. |
+| `hard_links_merged` | An inode with more than one name was counted once, here or in another finding. |
 | `sparse_file` | Logical size exceeds allocated size. |
 | `docker_reported_not_host` | Figure comes from Docker and is not part of host totals. |
-| `inside_other_scope` | Location is inside another measured scope; reported but not summed. |
+| `inside_other_scope` | Location equals or is inside an earlier claimant; displayed, but its counted contribution is 0. |
 
 ## Incomplete coverage
 

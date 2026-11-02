@@ -22,7 +22,7 @@ Disposition: `retain` keeps the behavior; `change` keeps the purpose with a diff
 | S5 | `--help`, `-h` | retain | Framework-generated help, starts with `Usage:` and has an `Example:` block. |
 | S6 | `--top N`, default 30 first-level entries per root | retain | `--top`, default 30; complete totals computed before truncation. |
 | S7 | `--large-file-min MB`, default 500 | retain | `--large-file-min`, default 500 MiB, compared with `logical_bytes` like `find -size`. |
-| S8 | Large files: top 20 per root, `find -xdev -type f -size +NM` | retain | Top 20 per root, `logical_bytes` descending, same volume boundary. |
+| S8 | Large files: top 20 per root, `find -xdev -type f -size +NM` | retain | Top 20 per root, selected and presented by `logical_bytes` descending, then path; same volume boundary. `logical_bytes` because the threshold is `st_size` (as `find -size`) and the collector ranked by `stat %z`. |
 | S9 | Large-file sweep suppresses permission errors | change | Errors go to `incomplete_coverage`. |
 | S10 | `--skip-categories` | retain | Same flag and meaning. |
 | S11 | `--output DIR` writing `.md` record and `.tsv` inventory | change | No `--output`; one JSON document on stdout, table opt-in. Users redirect stdout. TSV dropped. |
@@ -32,15 +32,15 @@ Disposition: `retain` keeps the behavior; `change` keeps the purpose with a diff
 | S15 | `diskutil info /`: Volume Name, File System Personality, Container Total Space, Container Free Space | retain | Same four fields in `data.system.diskutil`; values kept as strings. |
 | S16 | Scan root total and first-level sizes via `du -d 1 -k` | change | Own walker: allocated bytes, global hard-link identity, no crossing of `st_dev` (`du` without `-x` crossed mounts). |
 | S17 | Per-root count of unreadable entries | change | One `incomplete_coverage` entry per path with reason and errno. |
-| S18 | Nested scan root reported but excluded from the sum | retain | `details.nested: true`, `counted: false`. |
+| S18 | Nested scan root reported but excluded from the sum | retain | Displayed total from the enclosing walk; `counted_allocated_bytes: 0` (quantities.md, attribution precedence). |
 | S19 | Category list: User caches, Application support, App containers, Group containers, Developer data, Device backups (MobileSync, inside Application support), Mail, Messages, Downloads, Applications | retain | Same ten categories and labels, measured unless `--skip-categories`. |
-| S20 | Category inside a scan root shown but not summed | retain | `counted: false`, caveat `inside_other_scope`. |
-| S21 | Category nesting only hard-coded for MobileSync | change | Overlap detected in both directions for every category and root (WI-DISK-MAP-CATEGORIES AC-01). |
+| S20 | Category inside a scan root shown but not summed | retain | `overlap: inside_scan_root` or `equals_scan_root`, `counted_allocated_bytes: 0`, caveat `inside_other_scope`. |
+| S21 | Category nesting only hard-coded for MobileSync | change | Overlap detected in both directions for every category and root (WI-DISK-MAP-CATEGORIES AC-01): a category enclosing a root contributes only its unclaimed remainder (`encloses_scan_root`); a category inside an earlier category contributes 0 (`inside_category`). |
 | S22 | Local snapshot count: lines containing `com.apple` from `tmutil listlocalsnapshots /` | retain | `data.system.local_snapshot_count`, same counting rule; sizes not attributed. |
 | S23 | Docker availability: no CLI, daemon unreachable, or `docker system df` text | change | Disk map: informational `data.system.docker_informational` from `docker system df --format {{json .}}`, never summed. Full detail in `docker scan`. |
 | S24 | Tool caches uv, npm, brew via their own commands; only absolute existing paths | retain | Same three commands from the argv table; same path checks. |
 | S25 | Tool cache inside `~/Library/Caches` or a scan root counted once | retain | Counted once, reusing the caches measurement (WI-DISK-MAP-CATEGORIES AC-02). |
-| S26 | Reconciliation: measured = scan roots + counted categories; remainder clamped to 0 when negative | change | Signed `delta_bytes`; a negative delta sets `overcount: true` and is never clamped. |
+| S26 | Reconciliation: measured = scan roots + counted categories; remainder clamped to 0 when negative | change | Measured is the sum of unique counted contributions (`reconciliation.contributions`), so overlapping views are never double counted. Signed `delta_bytes`; a negative delta sets `overcount: true` and is never clamped. |
 | S27 | Incomplete Coverage section | retain | `meta.incomplete_coverage`; `status: partial`. |
 | S28 | Decision Queue empty by design | retain | `suggestions: []` in disk map; `see_check` points to the check that owns the location. |
 | S29 | Human units (`kb_human`) in output | change | Integer bytes in JSON; human units only in table output. |

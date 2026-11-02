@@ -52,7 +52,7 @@ Status rules:
 | `findings` | all | Array of findings, ordered as below. |
 | `suggestions` | all | Array of suggestions; always `[]` in `disk map`. |
 | `images`, `stopped_containers` | `docker scan` | Image inventory and stopped containers. |
-| `reconciliation`, `system`, `tree` | `disk map` | df reconciliation, system context, folder tree. |
+| `reconciliation`, `system`, `tree` | `disk map` | df reconciliation (`df_used_bytes`, `measured_allocated_bytes`, signed `delta_bytes`, `overcount`, and `contributions`: one `{finding_id, counted_allocated_bytes}` per reconciliation unit), system context, folder tree. |
 
 ## Finding
 
@@ -66,9 +66,9 @@ Status rules:
 | `reclaimable_estimate_bytes` | integer or null | See glossary. |
 | `caveats` | array of string | Codes from the caveat vocabulary in quantities.md. |
 | `see_check` | string or null | Another check that covers this location. Set only by `disk map`; `null` elsewhere. |
-| `suggestion_ids` | array of string | IDs of suggestions in `data.suggestions` that relate to this finding. |
+| `suggestion_ids` | array of string | IDs of suggestions in `data.suggestions` that relate to this finding, in suggestion order. |
 | `classification` | object | `owner`, `status`, `recovery`, `confidence`, `disposition` (below). |
-| `details` | object | Kind-specific fields. |
+| `details` | object | Kind-specific fields. Disk map reconciliation units (`root_total`, `category`, `tool_cache`) carry `counted_allocated_bytes` and `overlap` (`null`, `equals_scan_root`, `inside_scan_root`, `encloses_scan_root`, `inside_category`); see quantities.md. |
 
 Classification fields exist from 1.0.0 so later items never change the finding shape (WI-CORE AC-02). byte-census observes; it does not classify. Defaults:
 
@@ -96,7 +96,7 @@ Disk map emits no suggestions. When a finding's location is covered by another c
 1. `docker scan`: inside Docker's data location (for example `~/Library/Containers/com.docker.docker`).
 2. `caches scan`: `~/Library/Caches` or a uv, npm, or Homebrew cache location.
 3. `artifacts scan`: a path component named `node_modules`, `.venv`, `venv`, or `target` beside `Cargo.toml`.
-4. `duplicates scan`: Decision: every `large_file` finding and the first-level `Downloads` folder, because large files and downloads are the main duplicate candidates.
+4. `duplicates scan`: Decision: every `large_file` finding and the `Downloads` folder (as a first-level folder or as a category), because large files and downloads are the main duplicate candidates.
 
 Otherwise `see_check` is `null`.
 
@@ -112,7 +112,7 @@ Suggestions are text only. No suggestion string ever reaches the runner (WI-SUGG
 | `reversible` | boolean | `true` only if the effect can be undone exactly. Regenerable is not reversible. |
 | `requires_owner_authorization` | boolean | Always `true`. |
 | `reason` | string | Why the suggestion applies and what it removes. |
-| `finding_ids` | array of string | Related finding IDs, sorted. |
+| `finding_ids` | array of string | Related finding IDs, in `data.findings` order (see Ordering). |
 
 Catalog for 1.0.0:
 
@@ -128,28 +128,42 @@ Catalog for 1.0.0:
 | `artifact-remove-regenerate` | artifacts scan | per finding | `rm -rf -- '<artifact>' && cd -- '<project>' && <regenerate>` | medium |
 | `duplicate-remove-extra-copies` | duplicates scan | per finding | `rm -- '<path>'` for every name of every copy except the one that sorts first | high |
 
-Decision: a check-wide suggestion is emitted once per run when at least one related finding exists, and lists all related findings. A tool-cache suggestion is emitted only when that tool's cache was found.
+Decision: a check-wide suggestion is emitted once per run when at least one related finding exists, and lists all related findings. A tool-cache suggestion is emitted only when that tool's cache was found. `docker-system-prune-all` relates to Images, Containers, and Build Cache only: without `--volumes` it removes no volume, so volumes relate only to `docker-volume-prune`.
 
 ## Ordering
 
-All arrays are deterministic. Strings compare by Unicode code point.
+All arrays are deterministic. Strings compare by Unicode code point. Each array has exactly one presentation rule, stated here and nowhere else. Selection (which items survive `--top` or a fixed limit) is a separate step that runs first, on complete totals, so summaries never depend on truncation.
+
+Selection rules:
+
+| Selection | Key |
+|---|---|
+| `first_level` per root (`--top`, default 30) | `allocated_bytes` descending, then `target` ascending |
+| `large_file` per root (20) | `logical_bytes` descending, then `target` ascending |
+| Cache folders (`--top`, default 20) | `allocated_bytes` descending, then `target` ascending |
+| Tree nodes (`--tree-depth`, `--tree-min-mb`) | Threshold only; no ranking |
+
+Large files use `logical_bytes` for both selection and presentation because their threshold is `st_size` (like `find -size` in the replaced collector) and a sparse file such as `Docker.raw` is recognized by its logical size. Every other byte ranking uses `allocated_bytes`.
+
+Presentation rules:
 
 | Array | Order |
 |---|---|
 | `findings` (docker scan) | Docker type order: Images, Containers, Local Volumes, Build Cache. |
 | `findings` (caches, artifacts, duplicates) | `allocated_bytes` descending, then `target` ascending. |
-| `findings` (disk map) | Kind rank (`root_total`, `first_level`, `large_file`, `category`, `tool_cache`), then `allocated_bytes` descending, then `target` ascending. |
+| `findings` (disk map) | Kind rank (`root_total`, `first_level`, `large_file`, `category`, `tool_cache`); within a kind, the kind's size key descending (`logical_bytes` for `large_file`, `allocated_bytes` otherwise); then `target` ascending. |
 | `suggestions` | Risk (low, medium, high), then `id` ascending. |
-| `suggestion_ids`, `finding_ids` | Same order as their target arrays. |
-| `details.files` (duplicates) | `path` ascending. |
+| `finding.suggestion_ids` | Order of `data.suggestions`. |
+| `suggestion.finding_ids` | Order of `data.findings`. |
+| `reconciliation.contributions` (disk map) | Attribution precedence (quantities.md): roots by path, categories in catalog order, tool caches uv, npm, brew. |
+| `details.files` (duplicates) | `path` ascending; `hard_link_paths` within a file also `path` ascending. |
 | `images` | `docker_reported_size_bytes` descending, then repository, tag, image ID. |
 | `stopped_containers` | Name, then container ID. |
-| `tree` children | `allocated_bytes` descending, then `path`. |
+| `tree.roots` | `path` ascending. |
+| Tree `children` | `allocated_bytes` descending, then `path` ascending. |
 | `scope.roots` | `path` ascending; identical resolved roots are merged. |
 | `incomplete_coverage` | `path`, then `reason`. |
 | `unavailable_sources` | `source`. |
-
-Display truncation (`--top`) happens after complete totals are computed, so summaries are never affected by truncation.
 
 ## Error object
 
