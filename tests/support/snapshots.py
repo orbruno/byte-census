@@ -36,9 +36,8 @@ def allocated_bytes_of(path: str | os.PathLike[str]) -> int:
 
 def _replace_roots(value: Any, roots: tuple[str, ...]) -> Any:
     if isinstance(value, str):
-        for root in roots:
-            if value.startswith(root):
-                return ROOT_TOKEN + value[len(root) :]
+        for root in sorted(roots, key=len, reverse=True):
+            value = value.replace(root, ROOT_TOKEN)
         return value
     if isinstance(value, dict):
         return {key: _replace_roots(item, roots) for key, item in value.items()}

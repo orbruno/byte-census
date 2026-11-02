@@ -128,7 +128,7 @@ Catalog for 1.0.0:
 | `artifact-remove-regenerate` | artifacts scan | per finding | `rm -rf -- '<artifact>' && cd -- '<project>' && <regenerate>` | medium |
 | `duplicate-remove-extra-copies` | duplicates scan | per finding | `rm -- '<path>'` for every name of every copy except the one that sorts first | high |
 
-Decision: a check-wide suggestion is emitted once per run when at least one related finding exists, and lists all related findings. A tool-cache suggestion is emitted only when that tool's cache was found. `docker-system-prune-all` relates to Images, Containers, and Build Cache only: without `--volumes` it removes no volume, so volumes relate only to `docker-volume-prune`.
+Decision: a check-wide suggestion is emitted once per run when at least one related finding is shown, and lists every related finding that appears in the output; findings dropped by `--top` selection are never referenced, so no ID dangles. A tool-cache suggestion is emitted only when that tool's cache was found. `docker-system-prune-all` relates to Images, Containers, and Build Cache only: without `--volumes` it removes no volume, so volumes relate only to `docker-volume-prune`.
 
 ## Ordering
 

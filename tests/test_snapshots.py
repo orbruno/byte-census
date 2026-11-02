@@ -216,3 +216,10 @@ def test_normalize_rejects_a_finding_id_that_breaks_the_rule() -> None:
 
     with pytest.raises(AssertionError, match="dup-000000000000"):
         normalize({"data": {"findings": [bad]}})
+
+
+def test_roots_are_masked_inside_strings_and_longest_root_wins() -> None:
+    roots = ("/tmp/fx", "/tmp/fx/nested")
+    command = "rm -rf -- '/tmp/fx/nested/a' && cd -- '/tmp/fx/b'"
+    masked = snapshots._replace_roots({"command": command}, roots)
+    assert masked == {"command": "rm -rf -- '<ROOT>/a' && cd -- '<ROOT>/b'"}
