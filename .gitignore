@@ -60,3 +60,4 @@ test_files/
 # Tracked JSON: contract examples and test snapshots
 !docs/contracts/examples/*.json
 !tests/snapshots/*.json
+!gemini-extensions/*/gemini-extension.json

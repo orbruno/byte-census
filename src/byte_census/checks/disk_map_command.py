@@ -31,6 +31,8 @@ def disk() -> None:
     """
     Map where the data volume's used space is.
 
+    This is the one command that does not use the `scan` verb: use `disk map`.
+
     Example:
 
       \b

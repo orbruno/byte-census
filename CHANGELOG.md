@@ -4,6 +4,10 @@ All notable changes to this project are recorded here.
 
 ## Unreleased
 
+### Documentation
+
+- Added a root `SKILL.md` for agents, rewrote the README for byte-census 2.0.0 with help blocks checked against the live `--help` output, rewrote the agent extension in `gemini-extensions/` for byte-census and tracked its manifest, marked `SPECIFICATION.md` as the frozen v1 `dupfind` specification, and stated in `disk --help` that `disk map` is the one command without the `scan` verb.
+
 ### Changed
 
 - `artifacts scan` discovery lists directories through the shared safe lister.

@@ -1,274 +1,252 @@
-# Duplicate Finder CLI
+# byte-census
 
-A fast, reliable command-line tool for finding duplicate files using cryptographic hashing (SHA256).
+Author: Orlando Bruno | Version: 2.0.0
 
-Delivery: Functional
-Version: 1.0.0
-Verification: Nine unit and CLI regressions passed on 2026-08-28
+byte-census is a read-only command-line census of the bytes on a macOS disk. It reports where the space is, which folders can be regenerated, and what looks like a cleanup candidate, as JSON for programs or a table for people. It observes and suggests; it never deletes, moves, or changes anything.
 
-## Features
+The package also ships `dupfind`, the original duplicate finder, kept as a frozen legacy command (see [Legacy: dupfind](#legacy-dupfind)).
 
-- **Hash-based detection**: Uses SHA256 for accurate duplicate identification regardless of filename
-- **Efficient processing**: Chunked file reading handles large files (GB+) without memory issues
-- **Two modes**:
-  - **Single directory**: Find duplicates within one folder
-  - **Compare mode**: Find duplicates between two directories
-- **Multiple output formats**: Table (human-readable), JSON (machine-readable), CSV (spreadsheet-compatible)
-- **Flexible filtering**: Recursive/non-recursive search, minimum file size threshold
-- **Rich terminal output**: Color-coded results, progress tracking, summary statistics
+For an agent that has never seen the tool, start with [SKILL.md](SKILL.md).
 
-## Installation
+## Install
 
-### Project environment
+Python commands run through [uv](https://docs.astral.sh/uv/). From a clone of this repository:
 
 ```bash
-cd duplicate-finder-cli
+uv tool install --editable .
+byte-census --version
+```
+
+Without installing, run in the project environment:
+
+```bash
 uv sync
-uv run dupfind --help
-uv run byte-census --version
+uv run byte-census --help
 ```
 
-This creates the project environment and runs the command through the locked
-dependencies.
+Requires Python 3.11 or newer and macOS.
 
-### Global tool installation
+## Commands
 
-```bash
-uv tool install .
-dupfind --help
-```
+There are five commands. Four use the `scan` verb; `disk map` is the exception.
 
-## Usage
+## Command overview
 
-### Basic Usage
+<!-- help: byte-census -->
+```text
+Usage: byte-census [OPTIONS] COMMAND [ARGS]...
 
-Find duplicates in the current directory:
-```bash
-dupfind .
-```
-
-Find duplicates in a specific directory:
-```bash
-dupfind /Users/orlando/Downloads
-```
-
-### Compare Two Directories
-
-Find files that exist in both directories:
-```bash
-dupfind /path/folder1 --compare /path/folder2
-dupfind ~/Documents --compare ~/Backup/Documents
-```
-
-### Search Options
-
-**Non-recursive search** (don't scan subdirectories):
-```bash
-dupfind /path --no-recursive
-```
-
-**Ignore small files** (e.g., smaller than 1MB):
-```bash
-dupfind /path --min-size 1048576
-```
-
-**Quiet mode** (suppress progress bars):
-```bash
-dupfind /path --quiet
-```
-
-### Output Formats
-
-**Table format** (default, human-readable):
-```bash
-dupfind /path
-dupfind /path --format table
-```
-
-**JSON format** (for scripting and automation):
-```bash
-dupfind /path --format json
-dupfind /path --format json --output results.json
-```
-
-**CSV format** (for spreadsheets):
-```bash
-dupfind /path --format csv
-dupfind /path --format csv --output duplicates.csv
-```
-
-JSON and CSV results are written without terminal styling or line wrapping.
-Progress and diagnostics use stderr so stdout remains machine-readable.
-
-### Combined Examples
-
-```bash
-# Find large duplicate images (>100KB) in Photos, save as JSON
-dupfind ~/Photos --min-size 102400 --format json --output photo-dups.json
-
-# Compare two backup folders, non-recursive, CSV output
-dupfind ~/Backup/2024 --compare ~/Backup/2025 --no-recursive --format csv
-
-# Find all duplicates recursively, quiet mode, save results
-dupfind ~/Documents --quiet --format json --output ~/docs-duplicates.json
-```
-
-## Output Examples
-
-### Table Format
-```
-Found 3 duplicate groups (6 files, 45.2 MB wasted):
-
-Hash: a3f5b8c... (3 files, 15.4 MB each)
-  /Users/orlando/Downloads/report.pdf
-  /Users/orlando/Documents/report.pdf
-  /Users/orlando/Desktop/report-copy.pdf
-
-Hash: 9d2e1f4... (2 files, 7.2 MB each)
-  /Users/orlando/Photos/IMG_001.jpg
-  /Users/orlando/Photos/backup/IMG_001.jpg
-```
-
-### JSON Format
-```json
-{
-  "summary": {
-    "files_scanned": 1250,
-    "duplicate_groups": 3,
-    "duplicate_files": 6,
-    "wasted_bytes": 47448064,
-    "wasted_human": "45.2 MB"
-  },
-  "duplicates": {
-    "a3f5b8c...": {
-      "count": 3,
-      "size": 16140288,
-      "files": [
-        "/Users/orlando/Downloads/report.pdf",
-        "/Users/orlando/Documents/report.pdf",
-        "/Users/orlando/Desktop/report-copy.pdf"
-      ]
-    }
-  }
-}
-```
-
-### CSV Format
-```csv
-hash,file_count,size_bytes,file_path
-a3f5b8c...,3,16140288,/Users/orlando/Downloads/report.pdf
-a3f5b8c...,3,16140288,/Users/orlando/Documents/report.pdf
-a3f5b8c...,3,16140288,/Users/orlando/Desktop/report-copy.pdf
-```
-
-## Command Reference
-
-```
-Usage: dupfind [OPTIONS] PATH
-
-  Find duplicate files using cryptographic hashing.
-
-  PATH is the directory to scan for duplicates.
-
-Options:
-  -c, --compare PATH              Compare with another directory to find
-                                  duplicates between them
-  -r, --recursive / -R, --no-recursive
-                                  Search recursively in subdirectories
-                                  (default: recursive)
-  -f, --format [table|json|csv]   Output format (default: table)
-  -o, --output PATH               Save results to file instead of stdout
-  --min-size INTEGER RANGE        Minimum file size in bytes to consider
-                                  (default: 0)  [x>=0]
-  -q, --quiet                     Suppress progress output, only show results
-  -h, --help                      Show this message and exit.
+  Census of the bytes on disk.
 
   Example:
 
-    # Find duplicates in current directory
-    dupfind .
+      # Show the version
+      byte-census --version
 
-    # Find duplicates in Downloads (non-recursive)
-    dupfind ~/Downloads --no-recursive
+Options:
+  --version   Show the version and exit.
+  -h, --help  Show this message and exit.
 
-    # Compare two directories
-    dupfind /path/dir1 --compare /path/dir2
-
-    # Output as JSON to file
-    dupfind /path --format json --output results.json
-
-    # Ignore files smaller than 1MB
-    dupfind /path --min-size 1048576
+Commands:
+  artifacts   Find regenerable development folders.
+  caches      Find the largest caches.
+  disk        Map where the data volume's used space is.
+  docker      Observe Docker's own disk accounting.
+  duplicates  Find files with identical content.
 ```
 
-## How It Works
+### docker scan
 
-1. **File Collection**: Scans the specified directory for files, optionally recursively
-2. **Size Pre-check**: Hashes only files whose sizes can contain duplicate candidates
-3. **Hash Calculation**: Computes SHA256 using chunked reading (8KB chunks)
-4. **Duplicate Detection**: Groups files by hash; files with identical hashes are duplicates
-5. **Statistics**: Calculates files scanned and potential wasted space
-6. **Output**: Presents results in the requested format
+Docker's own accounting of images, containers, volumes, and build cache. Exits 4 when Docker is missing or not running.
 
-### Why SHA256?
+<!-- help: byte-census docker scan -->
+```text
+Usage: byte-census docker scan [OPTIONS]
 
-- **Collision-resistant**: Virtually impossible for two different files to have the same hash
-- **Industry standard**: Widely used for file integrity verification
-- **Fast**: Optimized implementations in Python's `hashlib`
-- **Reliable**: Works on any file type (images, documents, videos, etc.)
+  Report Docker disk usage, images, and stopped containers.
 
-## Technical Details
+  Figures are Docker-reported and are never added to host totals. Exits 4 when
+  the Docker CLI is missing or the daemon is not running. Nothing is changed.
 
-- **Language**: Python 3.11+
-- **Dependencies**: Click (CLI), Rich (terminal output)
-- **Hash Algorithm**: SHA256
-- **Memory Efficiency**: Chunked file reading (handles GB+ files)
-- **Symlinks**: Skipped by default (prevents double-counting)
-- **Performance**: ~100-200 files/second on typical hardware
+  Example:
 
-## Specification
+      byte-census docker scan --format table
 
-See [SPECIFICATION.md](SPECIFICATION.md) for the complete specification, test cases, and design rationale.
+Options:
+  --format [json|table]  Output format: JSON for programs, table for people.
+                         [default: json]
+  -h, --help             Show this message and exit.
+```
 
-## Use Cases
+### caches scan
 
-- **Clean up Downloads folder**: Find and remove duplicate downloads
-- **Backup verification**: Compare backup directories to ensure completeness
-- **Photo library**: Find duplicate photos across different folders
-- **Storage audit**: Identify wasted disk space from duplicates
-- **Archive management**: Deduplicate before archiving to save space
+The largest folders in `~/Library/Caches` plus the uv, npm, and Homebrew caches.
 
-## Limitations
+<!-- help: byte-census caches scan -->
+```text
+Usage: byte-census caches scan [OPTIONS]
 
-- **Read-only**: Does not delete files (by design for safety)
-- **Symlinks**: Skipped by default
-- **Hidden files**: Included in scan (use .gitignore-like exclusions in future version)
-- **Large directories**: May take time to hash thousands of files
+  Report the largest folders in ~/Library/Caches and the uv, npm, and Homebrew
+  caches. Read-only; it never deletes anything.
 
-## Roadmap (Future Enhancements)
+  Example:
 
-- [ ] Interactive deletion mode with preview
-- [ ] Auto-deletion with keep strategy (newest/oldest/smallest/largest)
-- [ ] Parallel hashing for speed (multiprocessing)
-- [ ] Exclude patterns (e.g., `--exclude "*.tmp"`)
-- [ ] Dry-run mode for deletion operations
-- [ ] Follow symlinks option
+      # The five largest caches, as a table
+      byte-census caches scan --top 5 --format table
 
-## Author
+Options:
+  --top INTEGER RANGE    Show only this many largest caches; totals cover all of
+                         them.  [default: 20; x>=1]
+  --format [json|table]  Output format: JSON for programs, table for people.
+                         [default: json]
+  -h, --help             Show this message and exit.
+```
 
-**Orlando Bruno**
+### artifacts scan
+
+Regenerable development folders (`node_modules`, `.venv`, `venv`, `target`) with the command that rebuilds each.
+
+<!-- help: byte-census artifacts scan -->
+```text
+Usage: byte-census artifacts scan [OPTIONS] ROOT
+
+  List node_modules, .venv, venv, and target folders under ROOT.
+
+  Each one is reported with its allocated size, its project, the project's
+  modification time, and the command that regenerates it. Nothing is removed;
+  the removal command is a suggestion only.
+
+  Example:
+
+      byte-census artifacts scan ~/Projects --format table
+
+Options:
+  --format [json|table]  Output format: JSON for programs, table for people.
+                         [default: json]
+  -h, --help             Show this message and exit.
+```
+
+### duplicates scan
+
+Files with identical content, grouped by size, a hash of the first 64 KiB, then a full SHA-256.
+
+<!-- help: byte-census duplicates scan -->
+```text
+Usage: byte-census duplicates scan [OPTIONS] PATH
+
+  Find duplicate files under PATH, reading as little content as possible.
+
+  Files are grouped by size, then by a SHA-256 of their first 64 KiB, then by a
+  full SHA-256. Hard links count as one copy. Nothing is deleted; suggestions
+  are text only and need the owner's authorization.
+
+  Example:
+
+      # Duplicates of at least 1 MiB in Downloads
+      byte-census duplicates scan ~/Downloads --min-size 1048576
+      
+      # Content present both in Downloads and in an archive
+      byte-census duplicates scan ~/Downloads --compare /Volumes/Archive
+
+Options:
+  --compare PATH                Report only content found both under PATH and
+                                under this directory.
+  --min-size INTEGER RANGE      Ignore files smaller than this many bytes. Empty
+                                files are always ignored.  [default: 0; x>=0]
+  --recursive / --no-recursive  Descend into subdirectories.  [default:
+                                recursive]
+  --format [json|table]         Output format: JSON for programs, table for
+                                people.  [default: json]
+  -h, --help                    Show this message and exit.
+```
+
+### disk map
+
+Where the used space of the data volume is, reconciled against `df`. It needs at least one `--scan-root`, and it reads inside privacy-protected folders, so macOS may show a permission prompt. A denial is recorded in `incomplete_coverage`, not raised as an error.
+
+<!-- help: byte-census disk map -->
+```text
+Usage: byte-census disk map [OPTIONS]
+
+  Measure each scan root on the data volume, its largest first-level folders and
+  large files, the macOS categories (caches, application support, containers,
+  developer data, backups, Mail, Messages, Downloads, Applications) and the uv,
+  npm, and Homebrew caches, then reconcile the total with `df -k
+  /System/Volumes/Data`. Overlapping scopes are shown but counted once; hard
+  links are counted once. System context (`df -k /`, `diskutil info /`, local
+  snapshots, Docker) is informational. Read-only; it never suggests or deletes
+  anything.
+
+  Example:
+
+      # Two roots, ten folders each
+      byte-census disk map --scan-root ~/Library --scan-root ~/Documents --top 10
+      
+      # Files over 1 GiB, as a table
+      byte-census disk map --scan-root ~ --large-file-min 1024 --format table
+
+Options:
+  --scan-root PATH            Folder on the data volume to measure. Repeat for
+                              several roots.  [required]
+  --top INTEGER RANGE         Show this many largest first-level folders per
+                              root; totals cover all.  [default: 30; x>=1]
+  --large-file-min MB         List files larger than this many MiB (20 largest
+                              per root).  [default: 500; x>=0]
+  --skip-categories           Measure only the scan roots: no macOS categories
+                              and no tool caches.
+  --tree-depth INTEGER RANGE  Folder levels below each root shown in the tree.
+                              [default: 4; x>=0]
+  --tree-min-mb MB            Show only tree folders of at least this many MiB.
+                              [default: 100; x>=0]
+  --format [json|table]       Output format: JSON for programs, table for
+                              people.  [default: json]
+  -h, --help                  Show this message and exit.
+```
+
+## Read-only guarantee
+
+Every command only reads. A test parses the source and fails if any module outside a short allowlist can write, delete, rename, change permissions, or start a process. External programs (`df`, `diskutil`, `tmutil`, `docker`) run only from a fixed argument list. Cleanup suggestions in the output are text with `requires_owner_authorization: true`; nothing in byte-census runs them, and they must not be run without the owner's approval. The model covers a careless caller and a changing filesystem, not a hostile one; byte sizes, hard links, volume boundaries, and privacy denials are defined in [docs/contracts/quantities.md](docs/contracts/quantities.md).
+
+## Output contract
+
+JSON is the default, printed as `{"data": ..., "meta": ...}`. Use `--format table` for people. Findings, suggestions, status, coverage gaps, and the error object are specified in [docs/contracts/](docs/contracts/), with one example per command in `docs/contracts/examples/`. `meta.schema_version` versions the contract independently from the package.
+
+## Exit codes
+
+- 0: success, including `status: partial`
+- 1: internal error
+- 2: usage error
+- 3: validation error (for example a missing scan root)
+- 4: a required source is unavailable (Docker not running, `df` failed)
+
+Errors are a JSON object on stderr.
+
+## Legacy: dupfind
+
+`dupfind` is the v1 duplicate finder. It is deprecated and frozen: its options, table, JSON, and CSV output, and exit codes stay as they were. Use `byte-census duplicates scan` for new work. Its specification is in [SPECIFICATION.md](SPECIFICATION.md); the exit-code matrix is in [docs/contracts/legacy-exit-codes.md](docs/contracts/legacy-exit-codes.md).
+
+```bash
+uv run dupfind ~/Downloads --min-size 1048576 --format json
+```
+
+## Development
+
+```bash
+uv sync
+uv run pytest
+uv run ruff check
+uv run ruff format --check
+```
+
+The README help blocks above are checked against the live `--help` output by `tests/test_readme_help.py`. When a command's help changes, update the matching block.
+
+## Project documents
+
+- Decision record: [ADR-001, Python implementation language](docs/adr/ADR-001__fw__python-implementation-language.md)
+- Backlog: [_Project-Management/Backlog/product-backlog.md](_Project-Management/Backlog/product-backlog.md)
+- Definition of Done: [_Project-Management/Definition-of-Done.md](_Project-Management/Definition-of-Done.md)
+- Changes: [CHANGELOG.md](CHANGELOG.md)
 
 ## License
 
-No license file is currently included. Choose a license before distributing the
-project for third-party reuse.
-
-## Verification
-
-```bash
-uv run python -m unittest -v
-```
-
----
-
-**Built with specification-first development** - See [SPECIFICATION.md](SPECIFICATION.md) for details
+No license file is currently included. Choose a license before distributing the project for third-party reuse.

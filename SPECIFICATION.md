@@ -1,5 +1,7 @@
 # Duplicate Finder CLI - Specification
 
+> Note: this document specifies the frozen v1 `dupfind` behavior. The byte-census 2.0.0 contracts live in [docs/contracts/](docs/contracts/README.md).
+
 ---
 **Version**: 1.0.0
 **Created**: 2025-12-20
