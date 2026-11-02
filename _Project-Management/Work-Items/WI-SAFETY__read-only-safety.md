@@ -13,7 +13,8 @@ definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
-  - WI-CORE
+  - WI-RENAME
+  - WI-CONTRACTS
 design_refs: []
 verification_refs: []
 superseded_by: null
@@ -28,7 +29,7 @@ author: Orlando Bruno
 
 ## Outcome
 
-The package cannot modify user data or run a non-allowlisted command, and tests prove it.
+The package cannot modify user data, block on special files, trigger downloads, or run a non-allowlisted command, and tests prove it.
 
 ## Context and Scope
 
@@ -42,12 +43,13 @@ Out of scope:
 
 ## Acceptance Criteria
 
-- AC-01: Only the runner module creates processes, with `shell=False`, a timeout on every call, and an allowlist of exact argv prefixes: `docker system df`, `docker images`, `docker ps`, `uv cache dir`, `npm config get cache`, `brew --cache`, `df -k`, `diskutil info`, `tmutil listlocalsnapshots`.
-- AC-02: A test rejects any argv outside the allowlist, including `docker system prune` and extra arguments after an allowed prefix where the contract forbids them.
-- AC-03: An AST-based guard fails if any module other than the runner calls `subprocess`, `os.system`, `os.popen`, `os.exec*`, `os.spawn*`, or `asyncio.create_subprocess_*`, and if any module other than the legacy adapter's report writer calls `os.remove`, `os.unlink`, `os.rmdir`, `os.rename`, `os.replace`, `os.truncate`, `os.chmod`, `shutil.rmtree`, `shutil.move`, `Path.unlink`, `Path.write_text`, `Path.write_bytes`, `Path.touch`, or `open` with a write, append, or update mode.
-- AC-04: Content reads open files with `O_NOFOLLOW`; symlinks are never followed during traversal.
-- AC-05: Path arguments containing null bytes or control characters exit 3; non-directory scan roots exit 3.
-- AC-06: A test hashes and scans a fixture tree and asserts its contents and modification times are unchanged; access-time updates from reading are documented as the one unavoidable side effect.
+- AC-01: Only the runner module creates processes, with `shell=False`, a timeout on every call, and argv matched exactly against the CONTRACTS argv table; any other flag or suffix is rejected.
+- AC-02: A test rejects argv outside the table, including `docker system prune`, `docker images --filter` variants not in the table, and extra trailing arguments.
+- AC-03: The AST guard is an allowlist: package modules may call only listed filesystem and process functions; `subprocess` and `shutil.which` are allowed only in the runner; write, create, rename, delete, permission, link, timestamp, and xattr operations (including `os.open` with write or create flags, `os.write`, `Path.open` in a write mode, `Path.rename`, `Path.replace`, `Path.chmod`, `Path.mkdir`, `os.mkdir`, `os.link`, `os.symlink`, `os.utime`, and `shutil.copy*`) are allowed only in `legacy/report_writer.py`; `ctypes`, `pty`, `tempfile`, `os.fork`, `os.posix_spawn`, and dynamic `getattr(os, ...)` are forbidden; `multiprocessing` is allowed only in a traversal module named by WI-PARALLEL-WALK; import aliases are resolved; the guard scans the package, not tests.
+- AC-04: Content reads `lstat` the path, require a regular file, open it with `O_RDONLY | O_NOFOLLOW | O_NONBLOCK`, and re-check identity with `fstat`; FIFOs, devices, and sockets are skipped.
+- AC-05: Dataless files (`SF_DATALESS` in `st_flags`, such as iCloud or File Provider placeholders) are never opened and are listed in `incomplete_coverage`, so no check triggers a download.
+- AC-06: Path arguments containing null bytes or control characters exit 3; non-directory scan roots exit 3.
+- AC-07: A test hashes and scans a fixture tree and asserts its contents and modification times are unchanged; access-time updates from reading are documented as the one unavoidable side effect.
 
 ## Dependencies and Risks
 

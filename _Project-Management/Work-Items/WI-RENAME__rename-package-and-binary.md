@@ -34,8 +34,9 @@ The project installs as byte-census 2.0.0 in a src layout, with `dupfind` behavi
 
 - AC-01: The package lives under `src/byte_census/`; pyproject declares name `byte-census`, version 2.0.0, and entry points `byte-census` and `dupfind`.
 - AC-02: `byte-census --version` prints 2.0.0, and bare `byte-census` shows help and exits 0.
-- AC-03: `dupfind` keeps its v1 behavior exactly; the nine existing tests move to `tests/legacy/` unchanged in intent and pass.
-- AC-04: pyproject declares a dev dependency group with pytest, pytest-cov, and ruff, added through `uv add --dev`.
+- AC-03: `dupfind` keeps its v1 stdout, JSON shape, and exit codes; its help text is updated to start with `Usage:` and an `Example:` block so it meets DOD-06; the nine existing tests move to `tests/legacy/` unchanged in intent and pass.
+- AC-04: The v1 report writer moves into `src/byte_census/legacy/report_writer.py`, the only module the WI-SAFETY guard allows to write.
+- AC-05: pyproject declares a dev dependency group with pytest, pytest-cov, and ruff, added through `uv add --dev`.
 
 ## Verification
 

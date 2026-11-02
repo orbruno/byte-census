@@ -13,8 +13,8 @@ definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
-  - WI-SAFETY
-  - WI-QUALITY
+  - WI-CORE
+  - WI-SUGGESTIONS
 design_refs: []
 verification_refs: []
 superseded_by: null
@@ -36,6 +36,7 @@ A user sees what Docker occupies and what Docker itself reports as reclaimable.
 - AC-01: `byte-census docker scan` reports `docker system df` per type, the image inventory (repository, tag, size, created), dangling image count, and stopped containers.
 - AC-02: A missing CLI or a stopped daemon exits 4 with a JSON error that says how to fix it.
 - AC-03: Docker sizes are labeled as Docker-reported and are never added to host filesystem totals.
+- AC-04: Findings carry catalog suggestions: `docker image prune` (low), `docker container prune` (medium), `docker system prune -a` and `docker volume prune` (high).
 
 ## Verification
 

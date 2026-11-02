@@ -32,7 +32,7 @@ The cognitive-harness storage-cleanup experiment uses byte-census instead of dup
 
 ## Acceptance Criteria
 
-- AC-01: The experiment preview obtains all five checks from byte-census JSON and no longer calls dupfind.
+- AC-01: The experiment preview obtains each of the five checks from its byte-census command JSON and no longer calls dupfind.
 
 ## Verification
 

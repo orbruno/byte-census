@@ -13,8 +13,8 @@ definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
-  - WI-SAFETY
-  - WI-QUALITY
+  - WI-CORE
+  - WI-SUGGESTIONS
 design_refs: []
 verification_refs: []
 superseded_by: null
@@ -36,6 +36,7 @@ A user sees the largest folders in `~/Library/Caches` plus uv, npm, and Homebrew
 - AC-01: `byte-census caches scan` computes complete totals for every cache folder before truncating the display to `--top` (default 20).
 - AC-02: uv, npm, and brew cache locations come from the tools through the runner and are counted once even when inside `~/Library/Caches`.
 - AC-03: A missing tool is reported as unavailable in `meta`, not as an error.
+- AC-04: Tool caches carry their catalog suggestions (`uv cache prune`, `brew cleanup`, `npm cache verify`), marked low risk.
 
 ## Verification
 

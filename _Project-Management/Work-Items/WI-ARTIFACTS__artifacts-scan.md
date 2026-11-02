@@ -13,8 +13,8 @@ definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
-  - WI-SAFETY
-  - WI-QUALITY
+  - WI-CORE
+  - WI-SUGGESTIONS
 design_refs: []
 verification_refs: []
 superseded_by: null
@@ -36,6 +36,8 @@ A user sees regenerable folders with their size and regeneration command.
 - AC-01: `byte-census artifacts scan ROOT` lists `node_modules`, `.venv`, `venv`, and `target` (only beside `Cargo.toml`) with path, kind, project, `allocated_bytes`, regeneration command, and project modification time.
 - AC-02: Discovery does not descend into found artifacts, `.git`, `Library`, `.Trash`, or symlinks; each found artifact is sized by a separate walk of its own subtree.
 - AC-03: Unreadable entries are listed in `incomplete_coverage`.
+- AC-04: Traversal order is sorted, so hard-link attribution is deterministic; each artifact carries a clone caveat because uv clones `.venv` files from its cache on APFS, so its size can overstate what removal frees.
+- AC-05: Each artifact carries the catalog suggestion to remove it with its regeneration command, marked medium risk.
 
 ## Verification
 

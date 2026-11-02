@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: dashboard
-source_fingerprint: sha256:4e9edc2dc672d6c3e8de18069a35189ea1b754a2dd3b4e2d6c8a55f1067935db
+source_fingerprint: sha256:f5700c83e516fcca46e46706007eddff06e429012bab74cd3d6a66430e9fbe71
 ---
 
 # Project Management Dashboard - duplicate-finder-cli
@@ -17,20 +17,20 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 ## Overall Progress
 
 - Completed estimated points: 0
-- Total included estimated points: 58
-- Remaining estimated points: 58
-- Estimated progress: 0 / 58 (0%)
+- Total included estimated points: 63
+- Remaining estimated points: 63
+- Estimated progress: 0 / 63 (0%)
 - Unestimated active Work Items: 5
 
 ## Delivery Summary
 
-- Effective active Work Items: 22
+- Effective active Work Items: 24
 - Completed Work Items: 0
 - Excluded Work Items: 0
-- Estimated active points: 58
+- Estimated active points: 63
 - Completed points: 0
 - Unestimated active Work Items: 5
-- Estimate coverage: 17/22 active items
+- Estimate coverage: 19/24 active items
 
 ## Epic Progress
 
@@ -43,18 +43,20 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 | ID | Kind | Epic | Title | Priority | Rank | Points | State |
 |---|---|---|---|---|---:|---:|---|
 | [WI-ADR-PYTHON](Work-Items/WI-ADR-PYTHON__python-implementation-decision.md) | decision | - | Record Python as the implementation language for byte-census | A | 1 | 1 | proposed |
-| [WI-CONTRACTS](Work-Items/WI-CONTRACTS__observation-contracts-and-parity.md) | decision | - | Define the observation contracts, parity matrix, and ADR-002 adaptations | A | 2 | 3 | proposed |
+| [WI-CONTRACTS](Work-Items/WI-CONTRACTS__observation-contracts-and-parity.md) | decision | - | Define the observation contracts, parity matrix, and ADR-002 adaptations | A | 2 | 5 | proposed |
 | [WI-RENAME](Work-Items/WI-RENAME__rename-package-and-binary.md) | enabler | - | Move to a src layout with byte-census and dupfind entry points | A | 3 | 3 | proposed |
-| [WI-CORE](Work-Items/WI-CORE__observation-core.md) | enabler | - | Provide the observation model, cost meter, errors, and rendering | A | 4 | 8 | proposed |
+| [WI-QUALITY](Work-Items/WI-QUALITY__quality-infrastructure.md) | enabler | - | Provide snapshot, coverage, and CI infrastructure | A | 4 | 2 | proposed |
 | [WI-SAFETY](Work-Items/WI-SAFETY__read-only-safety.md) | enabler | - | Enforce the read-only guarantee in code and tests | A | 5 | 5 | proposed |
-| [WI-QUALITY](Work-Items/WI-QUALITY__quality-infrastructure.md) | enabler | - | Provide snapshot, coverage, and CI infrastructure | A | 6 | 2 | proposed |
-| [WI-DUPLICATES](Work-Items/WI-DUPLICATES__duplicates-scan.md) | story | - | Find duplicates with size, partial-hash, and full-hash stages | A | 7 | 5 | proposed |
-| [WI-LEGACY-ADAPTER](Work-Items/WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md) | enabler | - | Keep dupfind as a frozen v1 adapter over the new engine | A | 8 | 3 | proposed |
-| [WI-SUGGESTIONS](Work-Items/WI-SUGGESTIONS__risk-ordered-suggestions.md) | story | - | Attach risk-ordered cleanup suggestions to findings | B | 1 | 2 | proposed |
-| [WI-ARTIFACTS](Work-Items/WI-ARTIFACTS__artifacts-scan.md) | story | - | Report regenerable development artifacts | B | 2 | 3 | proposed |
-| [WI-CACHES](Work-Items/WI-CACHES__caches-scan.md) | story | - | Report the largest user and tool caches | B | 3 | 3 | proposed |
-| [WI-DOCKER](Work-Items/WI-DOCKER__docker-scan.md) | story | - | Report Docker disk usage, images, and stopped containers | B | 4 | 3 | proposed |
-| [WI-DISK-MAP](Work-Items/WI-DISK-MAP__disk-map.md) | story | - | Map disk usage and reconcile it against df | B | 5 | 8 | proposed |
+| [WI-CORE](Work-Items/WI-CORE__observation-core.md) | enabler | - | Provide the observation model, cost meter, errors, and rendering | A | 6 | 8 | proposed |
+| [WI-SUGGESTIONS](Work-Items/WI-SUGGESTIONS__risk-ordered-suggestions.md) | story | - | Provide the risk-ordered cleanup suggestion catalog | A | 7 | 2 | proposed |
+| [WI-DUPLICATES](Work-Items/WI-DUPLICATES__duplicates-scan.md) | story | - | Find duplicates with size, partial-hash, and full-hash stages | A | 8 | 5 | proposed |
+| [WI-LEGACY-ADAPTER](Work-Items/WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md) | enabler | - | Keep dupfind as a frozen v1 adapter over the new engine | A | 9 | 3 | proposed |
+| [WI-ARTIFACTS](Work-Items/WI-ARTIFACTS__artifacts-scan.md) | story | - | Report regenerable development artifacts | B | 1 | 3 | proposed |
+| [WI-CACHES](Work-Items/WI-CACHES__caches-scan.md) | story | - | Report the largest user and tool caches | B | 2 | 3 | proposed |
+| [WI-DOCKER](Work-Items/WI-DOCKER__docker-scan.md) | story | - | Report Docker disk usage, images, and stopped containers | B | 3 | 3 | proposed |
+| [WI-DISK-MAP](Work-Items/WI-DISK-MAP__disk-map-traversal-and-reconciliation.md) | story | - | Map scan roots and reconcile them against df | B | 4 | 5 | proposed |
+| [WI-DISK-MAP-CATEGORIES](Work-Items/WI-DISK-MAP-CATEGORIES__disk-map-categories.md) | story | - | Add macOS categories and system context to the disk map | B | 5 | 3 | proposed |
+| [WI-DISK-MAP-TREE](Work-Items/WI-DISK-MAP-TREE__disk-map-tree-and-parity.md) | story | - | Add the folder tree and prove parity with the replaced collector | B | 6 | 3 | proposed |
 | [WI-AGENT-DOCS](Work-Items/WI-AGENT-DOCS__agent-documentation.md) | story | - | Document byte-census for agents and people | C | 1 | 3 | proposed |
 | [WI-VERIFY](Work-Items/WI-VERIFY__end-to-end-verification.md) | enabler | - | Verify byte-census with a real run and an agent | C | 2 | 2 | proposed |
 | [WI-RELEASE](Work-Items/WI-RELEASE__release-2-0-0.md) | enabler | - | Release byte-census 2.0.0 locally and on GitHub | C | 3 | 1 | proposed |

@@ -13,7 +13,7 @@ definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
-  - WI-CORE
+  - WI-RENAME
 design_refs: []
 verification_refs: []
 superseded_by: null
@@ -28,11 +28,11 @@ author: Orlando Bruno
 
 ## Outcome
 
-Every later check lands with snapshot tests and runs through CI, without retrofitting.
+Every later check lands with snapshot tests and runs through CI, without retrofitting, and the early items can close under the Definition of Done.
 
 ## Acceptance Criteria
 
-- AC-01: A snapshot helper compares JSON output after normalizing volatile fields (`captured_at`, `cost`, absolute fixture roots).
+- AC-01: A snapshot helper compares JSON output after normalizing volatile and machine-specific fields (`captured_at`, `cost`, absolute fixture roots, `scope.st_dev`); filesystem-dependent `allocated_bytes` is asserted against values computed from the fixture's own `lstat`, not frozen.
 - AC-02: The coverage gate fails the run below 80 percent line coverage.
 - AC-03: A GitHub Actions workflow on `macos-latest` runs ruff and the full suite, including legacy tests, on push and pull request.
 - AC-04: Per-check snapshot tests are required by the Definition of Done, not by this item.

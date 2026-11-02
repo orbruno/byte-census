@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: work-items
-source_fingerprint: sha256:4e9edc2dc672d6c3e8de18069a35189ea1b754a2dd3b4e2d6c8a55f1067935db
+source_fingerprint: sha256:f5700c83e516fcca46e46706007eddff06e429012bab74cd3d6a66430e9fbe71
 ---
 
 # Work Items
@@ -23,7 +23,9 @@ Index canonical Work Item records with their kind and derived Epic context witho
 - [WI-CACHES - story - standalone](WI-CACHES__caches-scan.md)
 - [WI-CONTRACTS - decision - standalone](WI-CONTRACTS__observation-contracts-and-parity.md)
 - [WI-CORE - enabler - standalone](WI-CORE__observation-core.md)
-- [WI-DISK-MAP - story - standalone](WI-DISK-MAP__disk-map.md)
+- [WI-DISK-MAP-CATEGORIES - story - standalone](WI-DISK-MAP-CATEGORIES__disk-map-categories.md)
+- [WI-DISK-MAP-TREE - story - standalone](WI-DISK-MAP-TREE__disk-map-tree-and-parity.md)
+- [WI-DISK-MAP - story - standalone](WI-DISK-MAP__disk-map-traversal-and-reconciliation.md)
 - [WI-DOCKER - story - standalone](WI-DOCKER__docker-scan.md)
 - [WI-DUPLICATES - story - standalone](WI-DUPLICATES__duplicates-scan.md)
 - [WI-LEGACY-ADAPTER - enabler - standalone](WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md)

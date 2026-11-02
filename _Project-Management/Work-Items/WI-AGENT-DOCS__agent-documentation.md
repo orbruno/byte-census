@@ -13,12 +13,11 @@ definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
-  - WI-DUPLICATES
   - WI-LEGACY-ADAPTER
   - WI-ARTIFACTS
   - WI-CACHES
   - WI-DOCKER
-  - WI-DISK-MAP
+  - WI-DISK-MAP-TREE
 design_refs: []
 verification_refs: []
 superseded_by: null

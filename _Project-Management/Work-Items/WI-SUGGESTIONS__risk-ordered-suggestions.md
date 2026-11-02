@@ -5,7 +5,7 @@ type: work-item
 id: WI-SUGGESTIONS
 work_item_kind: story
 profile: compact
-title: "Attach risk-ordered cleanup suggestions to findings"
+title: "Provide the risk-ordered cleanup suggestion catalog"
 parent: null
 points: 2
 status: proposed
@@ -24,7 +24,7 @@ updated: 2026-11-02
 author: Orlando Bruno
 ---
 
-# WI-SUGGESTIONS - Attach risk-ordered cleanup suggestions to findings
+# WI-SUGGESTIONS - Provide the risk-ordered cleanup suggestion catalog
 
 ## Outcome
 
@@ -34,7 +34,8 @@ An agent or user sees which cleanup commands could apply, ordered by risk, and t
 
 - AC-01: Each suggestion carries `id`, `command`, `risk` (low, medium, high), `reversible`, `requires_owner_authorization: true`, `reason`, and the finding IDs it relates to.
 - AC-02: Suggestions are sorted from low to high risk, then by ID.
-- AC-03: No suggestion string reaches the runner; a test asserts this.
+- AC-03: The catalog covers the suggestions each check emits; every check item lists the suggestions it attaches.
+- AC-04: No suggestion string reaches the runner; a test asserts this.
 
 ## Verification
 

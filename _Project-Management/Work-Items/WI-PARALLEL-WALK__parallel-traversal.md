@@ -13,7 +13,7 @@ definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
-  - WI-DISK-MAP
+  - WI-DISK-MAP-TREE
 design_refs: []
 verification_refs: []
 superseded_by: null
@@ -33,7 +33,7 @@ Disk map runs faster only if measurement on a full scan shows a gain without acc
 ## Acceptance Criteria
 
 - AC-01: A benchmark on `~/Documents` compares the single-process walk with a process-per-child walk, cold and warm.
-- AC-02: Parallelism is adopted only if it is at least 1.5 times faster and the accounting matrix still passes, with hard links attributed deterministically across workers.
+- AC-02: Parallelism is adopted only if it is at least 1.5 times faster and the accounting matrix still passes, with hard links merged globally and attributed deterministically across workers; the module that uses `multiprocessing` is named in the WI-SAFETY guard allowlist.
 - AC-03: Otherwise the item closes with the benchmark recorded and no code change.
 
 ## Verification

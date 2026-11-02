@@ -32,7 +32,7 @@ The existing consumer (the storage-cleanup experiment preview) keeps working whi
 
 ## Acceptance Criteria
 
-- AC-01: `dupfind` uses the new duplicates engine and renders the v1 JSON shape, CSV, and table output, with table as the default and exit 1 on errors.
+- AC-01: `dupfind` uses the new duplicates engine and renders the v1 JSON shape, CSV, and table output, with table as the default, and follows the CONTRACTS legacy exit-code matrix (2 argument misuse, 1 operational failure, 3 existing output file).
 - AC-02: `dupfind` prints a deprecation notice on stderr only; stdout is unchanged.
 - AC-03: `--output FILE` creates the file exclusively (`O_EXCL`); an existing file or symlink exits 3 with a suggestion; there is no `--force`.
 - AC-04: The legacy tests pass, plus new tests for exclusive creation and the refusal of existing files and symlinks.

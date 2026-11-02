@@ -13,8 +13,8 @@ definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
-  - WI-SAFETY
-  - WI-QUALITY
+  - WI-CORE
+  - WI-SUGGESTIONS
 design_refs: []
 verification_refs: []
 superseded_by: null
@@ -50,6 +50,7 @@ Out of scope:
 - AC-05: A file that vanishes or changes size or mtime between stages is excluded from groups and listed in `incomplete_coverage`.
 - AC-06: `--compare PATH`, `--min-size`, and `--recursive/--no-recursive` are supported; formats are json and table.
 - AC-07: `cost.content_bytes_read` equals the bytes read by the hashing stages in a fixture test.
+- AC-08: Each duplicate group carries the catalog suggestion for removing extra copies, marked high risk and requiring owner authorization.
 
 ## Dependencies and Risks
 

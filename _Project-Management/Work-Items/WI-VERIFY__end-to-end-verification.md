@@ -14,7 +14,6 @@ definition_of_done:
   version: "0.1.0"
 dependencies: 
   - WI-AGENT-DOCS
-  - WI-SUGGESTIONS
 design_refs: []
 verification_refs: []
 superseded_by: null
@@ -33,7 +32,7 @@ The project has evidence that byte-census replaces the experiment's orchestratio
 
 ## Acceptance Criteria
 
-- AC-01: A real run of all five checks is recorded with time per check and compared with the 2026-11-01 experiment capture as contextual evidence, with differences explained rather than expected to match.
+- AC-01: A real run of each of the five commands is recorded with time per check and compared with the 2026-11-01 experiment capture as contextual evidence, with differences explained rather than expected to match.
 - AC-02: An agent smoke test completes a three-step task using only `SKILL.md` and `--help`.
 - AC-03: The storage-cleanup experiment preview still runs with the legacy adapter.
 

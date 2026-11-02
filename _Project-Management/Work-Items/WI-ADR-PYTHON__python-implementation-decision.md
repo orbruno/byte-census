@@ -32,14 +32,15 @@ The project records why byte-census stays in Python although the CLI Creation pl
 ## Acceptance Criteria
 
 - AC-01: The decision record states the playbook default, the chosen option, and the rejected Rust rewrite.
-- AC-02: The record cites the 2026-11-02 traversal benchmark (du 10.3 s, Python single thread 6.2 s, Python 10 threads 6.3 s, Rust 10 threads 3.4 s, parallel du 3.4 s over 351,711 entries, warm cache) and states that the gain comes from parallelism, not language.
+- AC-02: The record cites the committed benchmark in `docs/benchmarks/2026-11-02-traversal/` (scripts and results): Python 10 processes 3.4 s equals Rust 10 threads 3.4 s and parallel du 3.4 s, while Python threads gain nothing (6.3 s versus 5.8 to 6.2 s single process).
 - AC-03: The record states the condition that documentation quality matches the playbook baseline (ADR-002 contracts, framework-generated help, SKILL.md).
+- AC-04: The record states a revisit trigger: reconsider Rust if WI-PARALLEL-WALK cannot reach its target or traversal time becomes the main complaint.
 
 ## Verification
 
 Required checks:
 
-- Decision record exists under `docs/adr/` and is linked from this item.
+- Decision record exists under `docs/adr/` and is linked from this item; benchmark files are committed.
 
 Evidence:
 

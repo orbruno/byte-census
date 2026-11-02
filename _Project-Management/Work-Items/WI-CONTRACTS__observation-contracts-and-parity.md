@@ -7,7 +7,7 @@ work_item_kind: decision
 profile: compact
 title: "Define the observation contracts, parity matrix, and ADR-002 adaptations"
 parent: null
-points: 3
+points: 5
 status: proposed
 definition_of_done:
   path: ../Definition-of-Done.md
@@ -35,9 +35,13 @@ Implementation starts from written contracts, so checks report comparable quanti
 - AC-01: A quantity glossary defines `logical_bytes` (st_size), `allocated_bytes` (st_blocks x 512), and `reclaimable_estimate_bytes`, all in bytes, with hard-link identity `(st_dev, st_ino)` deduplicated across the whole check, directory blocks counted, and a stated limitation that APFS clones and shared extents prevent traversal totals from guaranteeing reclaimed space.
 - AC-02: Docker figures are defined as informational and never added to host filesystem totals.
 - AC-03: A versioned JSON example exists for each of the five checks and for the error object, including finding IDs, suggestion IDs, stable ordering, `status` (`complete` or `partial`), and `incomplete_coverage`.
-- AC-04: A mapping table converts a CLI finding into a valid `personal-digital-operation-record` finding (owner as empty string when unknown, status `unknown`, recovery `unknown`, disposition and confidence defaults).
-- AC-05: A parity matrix marks each observable feature of storage-inventory.sh and the storage-cleanup experiment preview as retain, change, or defer, covering the system-volume df line, disk info, the category list, local snapshot count, Docker availability and image inventory, tool caches, the depth-limited folder tree, defaults, repeatable roots, the clamped negative remainder, and unavailable sources.
-- AC-06: An ADR-002 compliance matrix lists each requirement as met, adapted, or not applicable with rationale, including table and CSV output, unrestricted declared scan roots, `--dry-run` and `--yes` not applicable, `-h`, noninteractive operation, and parse errors as JSON.
+- AC-04: A mapping table converts a CLI finding into a `personal-digital-operation-record` finding (owner as empty string when unknown, status `unknown`, recovery `unknown`, disposition and confidence defaults); the schema version it maps to is recorded, and validation against that schema is a local check recorded as evidence because the schema is not part of this repository.
+- AC-05: Every walker in every check stays on the starting volume: descent never crosses an `st_dev` change, matching `find -xdev` in storage-inventory.sh.
+- AC-06: An exact argv table lists every external command with its fixed flags and validated variable operands, including `docker system df --format JSON_TEMPLATE`, `docker images --format JSON_TEMPLATE`, `docker images -f dangling=true -q`, `docker ps -a -f status=exited --format JSON_TEMPLATE`, `uv cache dir`, `npm config get cache`, `brew --cache`, `df -k PATH`, `diskutil info /`, and `tmutil listlocalsnapshots /`, where JSON_TEMPLATE is the Go template that renders each row as one JSON object; nothing else is permitted.
+- AC-07: Permission errors, including macOS privacy (TCC) denials such as EPERM on Mail, Messages, or Containers, map to `incomplete_coverage`; an OS consent dialog is documented as outside the CLI's control.
+- AC-08: A legacy exit-code matrix for dupfind records 2 for argument misuse (current Click behavior), 1 for operational failure, and 3 for an existing output file, each tied to a legacy test; the exit 3 case is recorded as the one intentional v2 change.
+- AC-09: A parity matrix marks each observable feature of storage-inventory.sh and the storage-cleanup experiment preview as retain, change, or defer, covering the system-volume df line, disk info, the category list, local snapshot count, Docker availability and image inventory, tool caches, the depth-limited folder tree, defaults, repeatable roots, the clamped negative remainder, and unavailable sources.
+- AC-10: An ADR-002 compliance matrix lists each requirement as met, adapted, or not applicable with rationale, including table and CSV output, unrestricted declared scan roots, `--dry-run` and `--yes` not applicable, `-h`, noninteractive operation, and parse errors as JSON.
 
 ## Verification
 
