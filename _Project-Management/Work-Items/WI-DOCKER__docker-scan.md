@@ -8,7 +8,7 @@ profile: compact
 title: "Report Docker disk usage, images, and stopped containers"
 parent: null
 points: 3
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -16,7 +16,9 @@ dependencies:
   - WI-CORE
   - WI-SUGGESTIONS
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/checks/test_docker.py
+  - ../../docs/verification/2026-11-02--end-to-end.md
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -46,8 +48,9 @@ Required checks:
 
 Evidence:
 
+- CI: run 41430472632 green on macos-latest at e354a83 on 2026-11-02; closure reviews at e354a83 READY for implementation, documentation corrected in 8ff6830.
 - Commit 1aefee2: four allowlisted docker argvs through the runner, exit 4 when the daemon or CLI is unavailable, Docker-reported sizes never summed; docker never executed in tests. Independent review pending.
-- Closure: held open until the first CI run is green.
+
 
 ---
 Last Updated: 2026-11-02

@@ -8,14 +8,16 @@ profile: compact
 title: "Keep dupfind as a frozen v1 command with safe report output"
 parent: null
 points: 2
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
   - WI-SAFETY
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/legacy/test_dupfind.py
+  - ../../tests/legacy/test_legacy_beneath.py
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -46,8 +48,9 @@ Required checks:
 
 Evidence:
 
+- CI: run 41430472632 green on macos-latest at e354a83 on 2026-11-02; closure reviews at e354a83 READY for implementation, documentation corrected in 8ff6830.
 - Commits 8d6ed9b, a8b6046: exclusive report creation (exit 3), deprecation notice on stderr, legacy hashing through fsread, cleanup of failed writes. v1 stdout and exit codes verified identical on a fixture with the locked click 8.3.1. TDD note: only the FIFO test's failure was captured before the hardening fix.
-- Closure: held open until the first CI run is green.
+
 
 ---
 Last Updated: 2026-11-02

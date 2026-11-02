@@ -62,6 +62,9 @@ ordered_items:
   - work_item_id: WI-PARALLEL-WALK
     priority: D
     rank: 1
+  - work_item_id: WI-FSREAD-SPLIT
+    priority: D
+    rank: 2
   - work_item_id: WI-SKILL-ABSORB
     priority: E
     rank: 1
@@ -112,6 +115,7 @@ Progress evidence: each of the five checks returns stable JSON and a table, repo
 | 2 | C | [WI-VERIFY](../Work-Items/WI-VERIFY__end-to-end-verification.md) |
 | 3 | C | [WI-RELEASE](../Work-Items/WI-RELEASE__release-2-0-0.md) |
 | 1 | D | [WI-PARALLEL-WALK](../Work-Items/WI-PARALLEL-WALK__parallel-traversal.md) |
+| 2 | D | [WI-FSREAD-SPLIT](../Work-Items/WI-FSREAD-SPLIT__split-fsread-and-drop-anchored-path.md) |
 | 1 | E | [WI-SKILL-ABSORB](../Work-Items/WI-SKILL-ABSORB__absorb-storage-audit-skill.md) |
 | 2 | E | [WI-ARCHIVE-INVENTORY](../Work-Items/WI-ARCHIVE-INVENTORY__archive-storage-inventory-script.md) |
 | 3 | E | [WI-SYSTEM-CONTEXT](../Work-Items/WI-SYSTEM-CONTEXT__system-context-route.md) |

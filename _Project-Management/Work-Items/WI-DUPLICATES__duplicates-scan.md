@@ -8,7 +8,7 @@ profile: full
 title: "Find duplicates with size, partial-hash, and full-hash stages"
 parent: null
 points: 5
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -16,7 +16,9 @@ dependencies:
   - WI-CORE
   - WI-SUGGESTIONS
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/checks/test_duplicates.py
+  - ../../docs/verification/2026-11-02--end-to-end.md
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -64,8 +66,9 @@ Required checks:
 
 Evidence:
 
+- CI: run 41430472632 green on macos-latest at e354a83 on 2026-11-02; closure reviews at e354a83 READY for implementation, documentation corrected in 8ff6830.
 - Commit 4fde168: three-stage hashing with exact content_bytes_read verified against an os.read spy; 51 tests. Independent review pending.
-- Closure: held open until the first CI run is green.
+
 
 ---
 Last Updated: 2026-11-02

@@ -8,14 +8,15 @@ profile: compact
 title: "Provide the risk-ordered cleanup suggestion catalog"
 parent: null
 points: 2
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
   - WI-CORE
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/test_suggestions.py
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -45,8 +46,9 @@ Required checks:
 
 Evidence:
 
+- CI: run 41430472632 green on macos-latest at e354a83 on 2026-11-02; closure reviews at e354a83 READY for implementation, documentation corrected in 8ff6830.
 - Commits f2eab38, f80893c, a211346: catalog matching the contract examples; review READY with hardening applied (order-independent FrozenMap hash, fixed regeneration commands, kept-copy guard, ANSI-C quoting, runtime isolation test).
-- Closure: held open until the first CI run is green.
+
 
 ---
 Last Updated: 2026-11-02

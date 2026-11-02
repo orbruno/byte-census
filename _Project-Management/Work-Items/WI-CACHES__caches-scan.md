@@ -8,7 +8,7 @@ profile: compact
 title: "Report the largest user and tool caches"
 parent: null
 points: 3
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -16,7 +16,9 @@ dependencies:
   - WI-CORE
   - WI-SUGGESTIONS
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/checks/test_caches.py
+  - ../../docs/verification/2026-11-02--end-to-end.md
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -46,8 +48,9 @@ Required checks:
 
 Evidence:
 
+- CI: run 41430472632 green on macos-latest at e354a83 on 2026-11-02; closure reviews at e354a83 READY for implementation, documentation corrected in 8ff6830.
 - Commit 3b9d786: complete totals before --top, uv and brew through the runner, npm resolved from configuration; 41 tests; smoke run 24.95 s over 787,984 entries. Process deviation: tests were written after the code (DOD-01 is met by the same commit, the TDD rule was not). Independent review pending.
-- Closure: held open until the first CI run is green.
+
 
 ---
 Last Updated: 2026-11-02

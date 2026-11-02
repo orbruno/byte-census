@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: dashboard
-source_fingerprint: sha256:c8cd3bcbeba0ccc5dbb1898a10934cab5b26be8c44ddbd7a4eec0197ae231073
+source_fingerprint: sha256:d8ebc6b6b9a524f4d80c2a074f3edf71f9d8085cee7533836e5bc014e0a7620f
 ---
 
 # Project Management Dashboard - duplicate-finder-cli
@@ -16,21 +16,21 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 
 ## Overall Progress
 
-- Completed estimated points: 19
-- Total included estimated points: 62
-- Remaining estimated points: 43
-- Estimated progress: 19 / 62 (31%)
+- Completed estimated points: 58
+- Total included estimated points: 65
+- Remaining estimated points: 7
+- Estimated progress: 58 / 65 (89%)
 - Unestimated active Work Items: 5
 
 ## Delivery Summary
 
-- Effective active Work Items: 19
-- Completed Work Items: 5
+- Effective active Work Items: 8
+- Completed Work Items: 17
 - Excluded Work Items: 0
-- Estimated active points: 43
-- Completed points: 19
+- Estimated active points: 7
+- Completed points: 58
 - Unestimated active Work Items: 5
-- Estimate coverage: 14/19 active items
+- Estimate coverage: 3/8 active items
 
 ## Epic Progress
 
@@ -42,20 +42,9 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 
 | ID | Kind | Epic | Title | Priority | Rank | Points | State |
 |---|---|---|---|---|---:|---:|---|
-| [WI-SAFETY](Work-Items/WI-SAFETY__read-only-safety.md) | enabler | - | Enforce the read-only guarantee in code and tests | A | 5 | 5 | in_progress |
-| [WI-SUGGESTIONS](Work-Items/WI-SUGGESTIONS__risk-ordered-suggestions.md) | story | - | Provide the risk-ordered cleanup suggestion catalog | A | 7 | 2 | in_progress |
-| [WI-DUPLICATES](Work-Items/WI-DUPLICATES__duplicates-scan.md) | story | - | Find duplicates with size, partial-hash, and full-hash stages | A | 8 | 5 | in_progress |
-| [WI-LEGACY-ADAPTER](Work-Items/WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md) | enabler | - | Keep dupfind as a frozen v1 command with safe report output | A | 9 | 2 | in_progress |
-| [WI-ARTIFACTS](Work-Items/WI-ARTIFACTS__artifacts-scan.md) | story | - | Report regenerable development artifacts | B | 1 | 3 | in_progress |
-| [WI-CACHES](Work-Items/WI-CACHES__caches-scan.md) | story | - | Report the largest user and tool caches | B | 2 | 3 | in_progress |
-| [WI-DOCKER](Work-Items/WI-DOCKER__docker-scan.md) | story | - | Report Docker disk usage, images, and stopped containers | B | 3 | 3 | in_progress |
-| [WI-DISK-MAP](Work-Items/WI-DISK-MAP__disk-map-traversal-and-reconciliation.md) | story | - | Map scan roots and reconcile them against df | B | 4 | 5 | proposed |
-| [WI-DISK-MAP-CATEGORIES](Work-Items/WI-DISK-MAP-CATEGORIES__disk-map-categories.md) | story | - | Add macOS categories and system context to the disk map | B | 5 | 3 | proposed |
-| [WI-DISK-MAP-TREE](Work-Items/WI-DISK-MAP-TREE__disk-map-tree-and-parity.md) | story | - | Add the folder tree and prove parity with the replaced collector | B | 6 | 3 | proposed |
-| [WI-AGENT-DOCS](Work-Items/WI-AGENT-DOCS__agent-documentation.md) | story | - | Document byte-census for agents and people | C | 1 | 3 | proposed |
-| [WI-VERIFY](Work-Items/WI-VERIFY__end-to-end-verification.md) | enabler | - | Verify byte-census with a real run and an agent | C | 2 | 2 | proposed |
 | [WI-RELEASE](Work-Items/WI-RELEASE__release-2-0-0.md) | enabler | - | Release byte-census 2.0.0 locally and on GitHub | C | 3 | 1 | proposed |
 | [WI-PARALLEL-WALK](Work-Items/WI-PARALLEL-WALK__parallel-traversal.md) | enabler | - | Measure and adopt process-parallel traversal if it pays off | D | 1 | 3 | proposed |
+| [WI-FSREAD-SPLIT](Work-Items/WI-FSREAD-SPLIT__split-fsread-and-drop-anchored-path.md) | enabler | - | Split fsread into focused modules and drop AnchoredPath | D | 2 | 3 | proposed |
 | [WI-SKILL-ABSORB](Work-Items/WI-SKILL-ABSORB__absorb-storage-audit-skill.md) | enabler | - | Absorb the storage-audit skill into the byte-census SKILL.md | E | 1 | null | proposed |
 | [WI-ARCHIVE-INVENTORY](Work-Items/WI-ARCHIVE-INVENTORY__archive-storage-inventory-script.md) | enabler | - | Archive storage-inventory.sh and update SPEC-002 | E | 2 | null | proposed |
 | [WI-SYSTEM-CONTEXT](Work-Items/WI-SYSTEM-CONTEXT__system-context-route.md) | enabler | - | Route storage work to byte-census in the system context | E | 3 | null | proposed |

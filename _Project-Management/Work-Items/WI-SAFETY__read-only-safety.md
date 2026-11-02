@@ -8,7 +8,7 @@ profile: full
 title: "Enforce the read-only guarantee in code and tests"
 parent: null
 points: 5
-status: in_progress
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -16,7 +16,10 @@ dependencies:
   - WI-RENAME
   - WI-CONTRACTS
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/test_guard.py
+  - ../../tests/test_runner.py
+  - ../../tests/test_fsread_dirfd.py
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -64,8 +67,9 @@ Required checks:
 
 Evidence:
 
+- CI: run 41430472632 green on macos-latest at e354a83 on 2026-11-02; closure reviews at e354a83 READY for implementation, documentation corrected in 8ff6830.
 - Commits 83666cb, 6f372f7, 1ea1ffd, d687f6f, b678063: runner with exact argv and pinned tools, fsread safe reads, paths, allowlist AST guard. Three security review rounds (BLOCKED, BLOCKED, BLOCKED) drove npm removal, an attribute allowlist and the documented threat model; closing review pending.
-- Closure: held open until the first CI run is green.
+
 
 ---
 Last Updated: 2026-11-02

@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: work-items
-source_fingerprint: sha256:c8cd3bcbeba0ccc5dbb1898a10934cab5b26be8c44ddbd7a4eec0197ae231073
+source_fingerprint: sha256:d8ebc6b6b9a524f4d80c2a074f3edf71f9d8085cee7533836e5bc014e0a7620f
 ---
 
 # Work Items
@@ -28,6 +28,7 @@ Index canonical Work Item records with their kind and derived Epic context witho
 - [WI-DISK-MAP - story - standalone](WI-DISK-MAP__disk-map-traversal-and-reconciliation.md)
 - [WI-DOCKER - story - standalone](WI-DOCKER__docker-scan.md)
 - [WI-DUPLICATES - story - standalone](WI-DUPLICATES__duplicates-scan.md)
+- [WI-FSREAD-SPLIT - enabler - standalone](WI-FSREAD-SPLIT__split-fsread-and-drop-anchored-path.md)
 - [WI-LEGACY-ADAPTER - enabler - standalone](WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md)
 - [WI-LEGACY-REMOVAL - enabler - standalone](WI-LEGACY-REMOVAL__remove-dupfind-adapter.md)
 - [WI-PARALLEL-WALK - enabler - standalone](WI-PARALLEL-WALK__parallel-traversal.md)

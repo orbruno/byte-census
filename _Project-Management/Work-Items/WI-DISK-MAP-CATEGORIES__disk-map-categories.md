@@ -8,7 +8,7 @@ profile: compact
 title: "Add macOS categories and system context to the disk map"
 parent: null
 points: 3
-status: proposed
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -16,7 +16,10 @@ dependencies:
   - WI-DISK-MAP
   - WI-CACHES
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../tests/checks/test_disk_map_categories.py
+  - ../../tests/checks/test_disk_map_system.py
+  - ../../docs/verification/2026-11-02--end-to-end.md
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -46,7 +49,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- CI: run 41430472632 green on macos-latest at e354a83 on 2026-11-02; closure reviews at e354a83 READY for implementation, documentation corrected in 8ff6830.
+- See [the end-to-end verification record](../../docs/verification/2026-11-02--end-to-end.md) and the commit history on feat/byte-census.
 
 ---
 Last Updated: 2026-11-02
