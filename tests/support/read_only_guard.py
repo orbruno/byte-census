@@ -92,7 +92,7 @@ OS_WRITE = frozenset(
     | {"mkdir", "makedirs", "mkfifo", "mknod", "link", "symlink"}
     | {"chmod", "lchmod", "fchmod", "chown", "lchown", "fchown", "chflags", "lchflags"}
     | {"utime", "truncate", "ftruncate", "write", "pwrite", "writev", "pwritev"}
-    | {"sendfile", "copy_file_range", "setxattr", "removexattr"}
+    | {"sendfile", "copy_file_range", "setxattr", "removexattr", "fdopen"}
 )
 PATH_WRITE_METHODS = frozenset(
     {"write_text", "write_bytes", "touch", "mkdir", "rmdir", "unlink", "rename"}

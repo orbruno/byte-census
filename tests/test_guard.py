@@ -97,6 +97,7 @@ def test_runner_may_not_use_other_shutil_functions() -> None:
         ("import os\nos.symlink('a', 'b')\n", "os.symlink"),
         ("import os\nos.utime('x')\n", "os.utime"),
         ("import os\nos.write(1, b'x')\n", "os.write"),
+        ("import os\nos.fdopen(3, 'w')\n", "os.fdopen"),
         ("import os\nos.truncate('x', 0)\n", "os.truncate"),
         ("import os\nos.setxattr('x', 'k', b'v')\n", "os.setxattr"),
         ("import os\nos.removexattr('x', 'k')\n", "os.removexattr"),
