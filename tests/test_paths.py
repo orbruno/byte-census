@@ -80,7 +80,7 @@ def test_rejects_inaccessible_path(
     def denied(path: str) -> os.stat_result:
         raise PermissionError(13, "Permission denied", path)
 
-    monkeypatch.setattr("byte_census.paths.os.stat", denied)
+    monkeypatch.setattr("byte_census.paths.os.lstat", denied)
 
     with pytest.raises(PathValidationError) as caught:
         validate_root(tmp_path)
@@ -102,3 +102,55 @@ def test_rejects_non_path_type() -> None:
         validate_root(b"/tmp")  # type: ignore[arg-type]
 
     assert caught.value.reason == "invalid_type"
+
+
+# L4: resolve first, then validate the resolved path with lstat.
+
+
+def test_resolved_path_is_what_gets_checked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    target = tmp_path / "real"
+    target.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(target)
+    checked: list[str] = []
+    real_lstat = os.lstat
+
+    def recording_lstat(path: str) -> os.stat_result:
+        checked.append(os.fspath(path))
+        return real_lstat(path)
+
+    def no_follow(path: str) -> os.stat_result:
+        raise AssertionError("validate_root must not follow links with os.stat")
+
+    monkeypatch.setattr("byte_census.paths.os.lstat", recording_lstat)
+    monkeypatch.setattr("byte_census.paths.os.stat", no_follow)
+    try:
+        validate_root(link)
+    finally:
+        monkeypatch.undo()
+
+    assert checked[-1] == os.path.realpath(target)
+
+
+def test_symlink_to_file_is_not_a_directory(tmp_path: Path) -> None:
+    target = tmp_path / "f"
+    target.write_text("x")
+    link = tmp_path / "link"
+    link.symlink_to(target)
+
+    with pytest.raises(PathValidationError) as caught:
+        validate_root(link)
+
+    assert caught.value.reason == "not_a_directory"
+
+
+def test_dangling_symlink_is_not_found(tmp_path: Path) -> None:
+    link = tmp_path / "link"
+    link.symlink_to(tmp_path / "missing")
+
+    with pytest.raises(PathValidationError) as caught:
+        validate_root(link)
+
+    assert caught.value.reason == "not_found"

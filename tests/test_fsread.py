@@ -9,6 +9,7 @@ import hashlib
 import os
 import socket
 import stat
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -399,3 +400,74 @@ def test_walk_items_are_immutable(tmp_path: Path) -> None:
 
     with pytest.raises(AttributeError):
         entry.path = "/"  # type: ignore[misc]
+
+
+# M3: dataless directories are never listed.
+
+
+def test_dataless_directory_is_recorded_and_not_listed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "cloud").mkdir()
+    (tmp_path / "cloud" / "inside.txt").write_text("x")
+    (tmp_path / "z.txt").write_text("z")
+    real = fsread._entry_lstat
+    listed: list[str] = []
+    real_scandir = os.scandir
+
+    def entry_lstat(entry: os.DirEntry[str]) -> Any:
+        result = real(entry)
+        if entry.name == "cloud":
+            return fake_stat(result, st_flags=SF_DATALESS)
+        return result
+
+    def scandir(path: Any) -> Any:
+        listed.append(os.fspath(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(fsread, "_entry_lstat", entry_lstat)
+    monkeypatch.setattr(fsread.os, "scandir", scandir)
+
+    items = list(walk(tmp_path))
+
+    cloud = str(tmp_path / "cloud")
+    assert listed == [str(tmp_path)]
+    assert items[0] == WalkEntry(cloud, items[0].stat)
+    assert items[1] == WalkError(cloud, "scandir", "dataless", None)
+    assert [i.path for i in items[2:]] == [str(tmp_path / "z.txt")]
+
+
+def test_dataless_root_is_recorded_and_not_listed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        fsread, "lstat", lambda p: fake_stat(os.lstat(p), st_flags=SF_DATALESS)
+    )
+    monkeypatch.setattr(fsread.os, "scandir", lambda p: pytest.fail("scandir called"))
+
+    items = list(walk(tmp_path))
+
+    assert items == [WalkError(str(tmp_path), "scandir", "dataless", None)]
+
+
+# L2: the walker is iterative.
+
+
+def test_walk_handles_trees_deeper_than_the_recursion_limit(tmp_path: Path) -> None:
+    depth = 150
+    deepest = tmp_path.joinpath(*["d"] * depth)
+    deepest.mkdir(parents=True)
+    (deepest / "leaf.txt").write_text("leaf")
+    limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(100)
+    try:
+        items = list(walk(tmp_path))
+    finally:
+        sys.setrecursionlimit(limit)
+
+    assert len(items) == depth + 1
+    assert items[-1].path == str(deepest / "leaf.txt")
+
+
+def test_walk_has_no_recursive_helper() -> None:
+    assert not hasattr(fsread, "_visit")

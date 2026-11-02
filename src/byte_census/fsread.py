@@ -197,31 +197,45 @@ def _sorted_entries(path: str) -> list[os.DirEntry[str]]:
         return sorted(iterator, key=lambda entry: os.fsencode(entry.name))
 
 
-def _visit(path: str, root_dev: int) -> Iterator[WalkItem]:
+DirEntries = Iterator[os.DirEntry[str]]
+
+
+def _open_dir(path: str, info: Any) -> tuple[list[WalkItem], DirEntries | None]:
+    """List a directory unless it is dataless or unreadable."""
+    if is_dataless(info):
+        return [WalkError(path, "scandir", "dataless", None)], None
     try:
-        entries = _sorted_entries(path)
+        return [], iter(_sorted_entries(path))
     except OSError as error:
-        yield _walk_error(path, "scandir", error)
-        return
-    for entry in entries:
-        try:
-            info = _entry_lstat(entry)
-        except OSError as error:
-            yield _walk_error(entry.path, "lstat", error)
-            continue
-        if stat.S_ISDIR(info.st_mode) and info.st_dev != root_dev:
-            yield SkippedMount(entry.path)
-            continue
-        yield WalkEntry(entry.path, info)
-        if stat.S_ISDIR(info.st_mode):
-            yield from _visit(entry.path, root_dev)
+        return [_walk_error(path, "scandir", error)], None
+
+
+def _step(
+    entry: os.DirEntry[str], root_dev: int
+) -> tuple[list[WalkItem], DirEntries | None]:
+    """Classify one entry and, for a same-device directory, list its children."""
+    try:
+        info = _entry_lstat(entry)
+    except OSError as error:
+        return [_walk_error(entry.path, "lstat", error)], None
+    is_dir = stat.S_ISDIR(info.st_mode)
+    if is_dir and info.st_dev != root_dev:
+        return [SkippedMount(entry.path)], None
+    item = WalkEntry(entry.path, info)
+    if not is_dir:
+        return [item], None
+    extra, children = _open_dir(entry.path, info)
+    return [item, *extra], children
 
 
 def walk(root: StrPath) -> Iterator[WalkItem]:
     """Walk root depth-first in byte order of names, never following symlinks.
 
-    Directories on a different st_dev than root are reported as SkippedMount
-    and not entered. The root itself is not yielded.
+    The walk is iterative, with an explicit stack of sorted listings. A
+    directory on a different st_dev than root is reported as SkippedMount and
+    not entered. A dataless directory is yielded, then reported as a
+    WalkError with reason `dataless`, and never listed. The root itself is not
+    yielded.
     """
     root_path = os.fspath(root)
     info = lstat(root_path)
@@ -229,4 +243,15 @@ def walk(root: StrPath) -> Iterator[WalkItem]:
         raise NotADirectoryError(
             errno.ENOTDIR, "scan root is not a directory", root_path
         )
-    yield from _visit(root_path, info.st_dev)
+    items, entries = _open_dir(root_path, info)
+    yield from items
+    stack = [entries] if entries is not None else []
+    while stack:
+        entry = next(stack[-1], None)
+        if entry is None:
+            stack.pop()
+            continue
+        items, children = _step(entry, info.st_dev)
+        yield from items
+        if children is not None:
+            stack.append(children)

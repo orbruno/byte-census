@@ -69,6 +69,20 @@ All notable changes to this project are recorded here.
 - Snapshot helper normalizes `meta.scope.roots[].st_dev` and path-derived IDs
   in `id`, `finding_id`, `finding_ids`, and `suggestion_ids`.
 
+### Security
+
+- The runner pins `df`, `diskutil`, and `tmutil` to absolute system paths,
+  rejects relative `PATH` lookups for docker, uv, npm, and brew, runs every
+  child with `cwd="/"` in its own session, kills the whole process group on
+  timeout, and caps captured output.
+- Children get a minimal explicit environment; npm log files and update
+  checks and Homebrew auto-update, analytics, and hints are switched off.
+- The walker no longer lists dataless directories (recorded as `dataless`)
+  and is iterative. `validate_root` resolves the path before checking it.
+- The AST guard now allowlists importable modules and catches aliasing,
+  dynamic attribute access, re-exports, and Path write methods in any
+  position.
+
 ## 2.0.0
 
 ### Changed

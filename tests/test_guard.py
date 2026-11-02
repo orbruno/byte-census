@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 
 from tests.support.read_only_guard import (
+    MODULE_ALLOWLIST,
+    PACKAGE_ALLOWLIST,
     PACKAGE_DIR,
     RUNNER,
     WRITER,
@@ -109,7 +111,6 @@ def test_runner_may_not_use_other_shutil_functions() -> None:
         ("import shutil\nshutil.copytree('a', 'b')\n", "shutil.copytree"),
         ("import shutil\nshutil.move('a', 'b')\n", "shutil.move"),
         ("import shutil\nshutil.rmtree('a')\n", "shutil.rmtree"),
-        ("import xattr\n", "xattr"),
     ],
 )
 def test_write_functions_outside_writer_are_flagged(source: str, fragment: str) -> None:
@@ -297,10 +298,10 @@ def test_runner_may_not_write() -> None:
     assert_flags("from pathlib import Path\nPath('x').unlink()\n", "write", RUNNER)
 
 
-def test_shadowed_name_is_not_resolved_to_os() -> None:
+def test_shadowing_a_restricted_alias_is_flagged_conservatively() -> None:
     source = "import os\ndef f(os):\n    return os\n"
 
-    assert violations(source) == []
+    assert_flags(source, "used as a value")
 
 
 def test_check_package_reports_relative_paths(tmp_path: Path) -> None:
@@ -313,3 +314,147 @@ def test_check_package_reports_relative_paths(tmp_path: Path) -> None:
 
     assert found.path == "byte_census/legacy/bad.py"
     assert found.line == 1
+
+
+# M1: confirmed bypasses from the security review, each planted.
+
+BYPASSES = [
+    ("import os\nf = os\nf.remove('x')\n", "used as a value"),
+    ("import os\ng = getattr\ng(os, 'remove')('x')\n", "getattr"),
+    ("__builtins__['open']('x', 'w')\n", "__builtins__"),
+    ("import sys\nsys.modules['os'].remove('x')\n", "sys.modules"),
+    ("import os\nvars(os)['remove']('x')\n", "vars"),
+    ("globals()['x'] = 1\n", "globals"),
+    ("locals()\n", "locals"),
+    ("from pathlib import Path\nw = Path('x').write_text\nw('y')\n", "write_text"),
+    ("getattr(obj, 'write_text')('y')\n", "write_text"),
+    ("getattr(obj, name)\n", "non-constant"),
+    ("setattr(obj, name, 1)\n", "non-constant"),
+    ("import os\nsetattr(os, 'remove', print)\n", "setattr on os"),
+    ("delattr(obj, name)\n", "non-constant"),
+    ("getattr(obj, '__dict__')\n", "__dict__"),
+    ("x = obj.__dict__\n", "__dict__"),
+    ("x = f.__globals__['os']\n", "__globals__"),
+    ("from pathlib import Path\nPath('a').replace(target='b')\n", "Path.replace"),
+    ("from pathlib import Path\nPath.replace(p, 'b')\n", "Path.replace"),
+    ("from pathlib import Path\nPath('a').copy('b')\n", "Path.copy"),
+    ("from pathlib import Path\nPath('a').copy(target='b')\n", "Path.copy"),
+    ("from pathlib import Path\nPath('a').move('b')\n", "Path.move"),
+    ("from pathlib import Path\nPath('a').copy_into('d')\n", "Path.copy_into"),
+    ("from pathlib import Path\nPath('a').move_into('d')\n", "Path.move_into"),
+    ("from pathlib import Path\nPath.open(p, 'w')\n", "open"),
+    ("o = open\no('x', 'w')\n", "open used as a value"),
+    ("from . import fsread\nfsread.os.remove('x')\n", "through byte_census"),
+    ("from .fsread import os\n", "through byte_census"),
+    ("from byte_census import fsread\nfsread.os.remove('x')\n", "through byte_census"),
+    ("import byte_census.runner\nbyte_census.runner.subprocess.run([])\n", "through"),
+    ("from .. import x\n", "relative import"),
+    ("import _io\n", "_io"),
+    ("import gzip\n", "gzip"),
+    ("import zipfile\n", "zipfile"),
+    ("import sqlite3\n", "sqlite3"),
+    ("import logging\n", "logging"),
+    ("from logging import FileHandler\n", "logging"),
+    ("import shelve\n", "shelve"),
+    ("import mmap\n", "mmap"),
+    ("import fcntl\n", "fcntl"),
+    ("import asyncio\n", "asyncio"),
+    ("import platform\nplatform.popen('ls')\n", "platform"),
+    ("import webbrowser\n", "webbrowser"),
+    ("import xattr\n", "xattr"),
+    ("import builtins\n", "builtins"),
+    ("import io\nio.FileIO('x', 'w')\n", "io.FileIO"),
+    ("import io\nf = io.open\n", "io.open"),
+    ("import io\nio.open_code('x')\n", "io allowlist"),
+    ("import sys\nsys._getframe()\n", "sys allowlist"),
+    ("import signal\nsignal.signal(2, print)\n", "signal allowlist"),
+    ("import click\nclick.launch('x')\n", "click.launch"),
+    ("import click\nclick.open_file('x', 'w')\n", "click.open_file"),
+    ("console.save_html('x.html')\n", "save_html"),
+    ("import shutil\nw = shutil.which\n", "process"),
+    ("import os\nk = os.killpg\n", "process"),
+]
+
+
+@pytest.mark.parametrize(("source", "fragment"), BYPASSES, ids=[b[0] for b in BYPASSES])
+def test_confirmed_bypasses_are_caught(source: str, fragment: str) -> None:
+    assert_flags(source, fragment, "byte_census/scan_module.py")
+
+
+def test_relative_imports_resolve_against_the_module_package() -> None:
+    source = "from ..runner import subprocess\n"
+
+    assert_flags(source, "byte_census.runner.subprocess", "byte_census/legacy/scan.py")
+
+
+def test_unlisted_import_names_the_module() -> None:
+    (found,) = violations("import gzip\n")
+
+    assert found.reason == "import of gzip is not in the module allowlist"
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "x = {}.copy()\n",
+        "import os\nenv = os.environ.copy()\n",
+        "name = 'a'.replace('a', 'b', 1)\n",
+        "when = moment.replace(tzinfo=None)\n",
+        "flags = getattr(info, 'st_flags', 0)\n",
+        "from byte_census.legacy.consoles import console\nconsole.print('x')\n",
+        "from . import paths\npaths.validate_root('x')\n",
+        "import io\nbuffer = io.StringIO()\n",
+        "import json, re, time, datetime, enum, hashlib, stat, sys, typing\n",
+        "import sys\nsys.exit(0)\n",
+        "from rich.progress import track\n",
+        "import click\n@click.command()\ndef f():\n    pass\n",
+        "from pathlib import Path\nkind = Path\n",
+        "if __name__ == '__main__':\n    pass\n",
+    ],
+)
+def test_ordinary_code_passes(source: str) -> None:
+    assert violations(source) == []
+
+
+def test_runner_may_reference_its_process_defaults() -> None:
+    source = (
+        "import os, shutil, subprocess, signal, time\n"
+        "def run(launcher=subprocess.Popen, which=shutil.which, killpg=os.killpg,"
+        " clock=time.monotonic):\n"
+        "    killpg(1, signal.SIGKILL)\n"
+    )
+
+    assert violations(source, RUNNER) == []
+
+
+def test_module_allowlist_is_exactly_documented() -> None:
+    assert MODULE_ALLOWLIST == frozenset(
+        {
+            "__future__",
+            "collections",
+            "collections.abc",
+            "contextlib",
+            "csv",
+            "dataclasses",
+            "datetime",
+            "enum",
+            "errno",
+            "hashlib",
+            "io",
+            "json",
+            "os",
+            "os.path",
+            "pathlib",
+            "re",
+            "selectors",
+            "shutil",
+            "signal",
+            "stat",
+            "subprocess",
+            "sys",
+            "time",
+            "typing",
+            "unicodedata",
+        }
+    )
+    assert PACKAGE_ALLOWLIST == ("byte_census", "click", "rich")

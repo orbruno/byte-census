@@ -36,8 +36,8 @@ def validate_root(path: str | os.PathLike[str]) -> Path:
     """Return the resolved scan root, or raise PathValidationError.
 
     Rejects empty paths, null bytes, and control characters (Unicode category
-    Cc: C0, DEL, and C1), then requires an existing directory. A symlinked
-    root is resolved once with realpath.
+    Cc: C0, DEL, and C1), then resolves the path once with realpath and
+    requires the resolved path, checked with lstat, to be a directory.
     """
     if not isinstance(path, (str, os.PathLike)):
         raise PathValidationError(repr(path), "invalid_type", "path must be a string")
@@ -45,8 +45,9 @@ def validate_root(path: str | os.PathLike[str]) -> Path:
     if not isinstance(text, str):
         raise PathValidationError(repr(text), "invalid_type", "path must be a string")
     _check_characters(text)
+    resolved = os.path.realpath(text)
     try:
-        info = os.stat(text)
+        info = os.lstat(resolved)
     except FileNotFoundError as error:
         raise PathValidationError(
             text, "not_found", f"path does not exist: {text}"
@@ -59,4 +60,4 @@ def validate_root(path: str | os.PathLike[str]) -> Path:
         raise PathValidationError(
             text, "not_a_directory", f"path is not a directory: {text}"
         )
-    return Path(os.path.realpath(text))
+    return Path(resolved)

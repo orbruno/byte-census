@@ -66,6 +66,7 @@ A finding carries the caveat `hard_links_merged` when one of its inodes has anot
 - The mount-point directory itself is not counted; its path is listed in `meta.scope.skipped_mounts`. A skipped mount is a declared exclusion, not a coverage gap.
 - Symlinks are never followed below a root. Decision: a scan root given as a symlink is resolved once with `realpath`; `meta.scope.roots[].given` keeps the argument and `path` the resolved location. The legacy `dupfind` keeps its v1 behavior of skipping a symlinked root.
 - `disk map` additionally requires each root to resolve to the data volume (`/System/Volumes/Data`); see WI-DISK-MAP.
+- Firmlinks: on macOS the user data under `/Users`, `/Applications`, and similar paths lives on the data volume and appears under `/` through firmlinks. A walk that starts at `/` (on the read-only system volume) stops at the `st_dev` change and therefore skips that user data. This is expected, not a gap; disk map requires data-volume roots for this reason.
 
 ## Docker figures
 
@@ -82,6 +83,7 @@ Docker figures are informational. They describe space inside Docker's own storag
 - Sparse files (for example `Docker.raw`) have `logical_bytes` far above `allocated_bytes`; such findings carry the caveat `sparse_file`.
 - Purgeable space and other users' data are part of `df` used space but outside any declared root; disk map reports them only as part of the reconciliation delta.
 - Reading a file updates its access time. This is the one unavoidable side effect of a content read (WI-SAFETY AC-07).
+- Known residual risk, dataless eviction: the dataless check uses the `lstat` result and repeats it on the opened descriptor with `fstat`. If the system evicts a file to a dataless placeholder between `lstat` and `open`, the `open` itself can trigger a download before the `fstat` check refuses the descriptor. The window is a few system calls wide. Closing it would need a kernel-level policy (for example the `IOPOL_MATERIALIZE_DATALESS_FILES` I/O policy), which byte-census does not set because it would require `ctypes`, which the read-only guard forbids.
 
 ## Caveat vocabulary
 
@@ -103,7 +105,7 @@ Entry shape: `path`, `reason`, `errno` (symbolic name or `null`), `operation` (`
 |---|---|
 | `permission_denied` | `EACCES` from POSIX permissions. |
 | `privacy_denied` | `EPERM`. On macOS this is almost always a privacy (TCC) denial, for example `~/Library/Mail`, `~/Library/Messages`, or app containers under `~/Library/Containers`. System Integrity Protection can also return `EPERM`; the entry is the same. |
-| `dataless` | `SF_DATALESS` is set in `st_flags` (iCloud or File Provider placeholder). The file is never opened, so no download is triggered. Its lstat values are still counted in metadata-only checks; duplicates excludes it from grouping. |
+| `dataless` | `SF_DATALESS` is set in `st_flags` (iCloud or File Provider placeholder). A dataless file is never opened, so no download is triggered. Its lstat values are still counted in metadata-only checks; duplicates excludes it from grouping. A dataless directory is counted from its own lstat and recorded with operation `scandir`, but never listed, because listing it would materialize its contents. |
 | `vanished` | `ENOENT` for an entry that was listed a moment earlier. |
 | `changed_during_scan` | A duplicates candidate whose size or mtime changed between stages; it is excluded from groups. |
 | `read_error` | Any other `OSError` on a read, with its `errno`. |
