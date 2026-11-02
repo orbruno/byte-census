@@ -694,7 +694,7 @@
       "content_bytes_read": 0,
       "entries_visited": 41,
       "subprocess_calls": 7,
-      "subprocess_stdout_bytes": 1094,
+      "subprocess_stdout_bytes": "<VOLATILE>",
       "subprocess_content_bytes_read": null,
       "notes": {
         "subprocess_content_bytes_read": "Reads performed inside external commands cannot be measured from this process."

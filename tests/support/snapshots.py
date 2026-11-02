@@ -108,14 +108,35 @@ class _IdNumbering:
         return value
 
 
-def normalize(data: Any, roots: Iterable[str | os.PathLike[str]] = ()) -> Any:
-    """Return a copy of data with volatile and machine-specific fields masked."""
+def normalize(
+    data: Any,
+    roots: Iterable[str | os.PathLike[str]] = (),
+    volatile: Iterable[str] = (),
+) -> Any:
+    """Return a copy of data with volatile and machine-specific fields masked.
+
+    `volatile` names extra dotted paths (for example
+    `meta.cost.subprocess_stdout_bytes`) whose values depend on the fixture
+    location; a caller that masks one must assert its exact value itself.
+    """
     _check_finding_ids(data)
     result = copy.deepcopy(data)
     if isinstance(result, dict):
         _mask_meta(result)
+        for dotted in volatile:
+            _mask_path(result, dotted.split("."))
     ordered = sorted((str(root) for root in roots), key=len, reverse=True)
     return _IdNumbering().walk(_replace_roots(result, tuple(ordered)))
+
+
+def _mask_path(holder: Any, keys: list[str]) -> None:
+    for key in keys[:-1]:
+        if not isinstance(holder, dict) or key not in holder:
+            raise AssertionError(f"volatile path not found: {'.'.join(keys)}")
+        holder = holder[key]
+    if not isinstance(holder, dict) or keys[-1] not in holder:
+        raise AssertionError(f"volatile path not found: {'.'.join(keys)}")
+    holder[keys[-1]] = "<VOLATILE>"
 
 
 def _render(data: Any) -> str:
@@ -123,10 +144,13 @@ def _render(data: Any) -> str:
 
 
 def assert_json_snapshot(
-    data: Any, name: str, roots: Iterable[str | os.PathLike[str]] = ()
+    data: Any,
+    name: str,
+    roots: Iterable[str | os.PathLike[str]] = (),
+    volatile: Iterable[str] = (),
 ) -> None:
     """Compare normalized data with tests/snapshots/<name>.json."""
-    rendered = _render(normalize(data, roots))
+    rendered = _render(normalize(data, roots, volatile))
     path = SNAPSHOT_DIR / f"{name}.json"
     if os.environ.get(UPDATE_ENV) == "1":
         path.parent.mkdir(parents=True, exist_ok=True)

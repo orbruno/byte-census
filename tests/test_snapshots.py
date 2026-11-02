@@ -223,3 +223,11 @@ def test_roots_are_masked_inside_strings_and_longest_root_wins() -> None:
     command = "rm -rf -- '/tmp/fx/nested/a' && cd -- '/tmp/fx/b'"
     masked = snapshots._replace_roots({"command": command}, roots)
     assert masked == {"command": "rm -rf -- '<ROOT>/a' && cd -- '<ROOT>/b'"}
+
+
+def test_volatile_paths_are_masked_and_must_exist() -> None:
+    data = {"meta": {"cost": {"elapsed_s": 1.0, "subprocess_stdout_bytes": 7}}}
+    masked = normalize(data, volatile=["meta.cost.subprocess_stdout_bytes"])
+    assert masked["meta"]["cost"]["subprocess_stdout_bytes"] == "<VOLATILE>"
+    with pytest.raises(AssertionError, match="volatile path not found"):
+        normalize(data, volatile=["meta.cost.missing"])

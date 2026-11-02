@@ -75,6 +75,7 @@ class FakeRunner:
 
     answers: dict[tuple[str, ...], Answer] = field(default_factory=dict)
     calls: list[tuple[str, ...]] = field(default_factory=list)
+    stdout_bytes_returned: int = 0
 
     def __post_init__(self) -> None:
         defaults: dict[tuple[str, ...], Answer] = {
@@ -92,6 +93,7 @@ class FakeRunner:
         if isinstance(answer, Exception):
             raise answer
         code, stdout, stderr = answer if isinstance(answer, tuple) else (0, answer, "")
+        self.stdout_bytes_returned += len(stdout.encode())
         return runner.RunResult(
             argv=key,
             executable="/fake/" + key[0],

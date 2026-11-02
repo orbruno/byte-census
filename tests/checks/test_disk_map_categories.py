@@ -104,7 +104,16 @@ def test_snapshot(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
     result, payload = run_map(monkeypatch, world, tree.roots(), "--large-file-min", "0")
 
     assert result.exit_code == 0, result.stderr
-    assert_json_snapshot(payload, "disk-map-categories", roots=[world.data])
+    # Fake tool output embeds the fixture path, whose length differs between
+    # machines, so the counter is checked exactly here and masked below.
+    cost = payload["meta"]["cost"]
+    assert cost["subprocess_stdout_bytes"] == world.runner.stdout_bytes_returned
+    assert_json_snapshot(
+        payload,
+        "disk-map-categories",
+        roots=[world.data],
+        volatile=["meta.cost.subprocess_stdout_bytes"],
+    )
 
 
 def test_enclosing_category_contributes_only_its_remainder(
