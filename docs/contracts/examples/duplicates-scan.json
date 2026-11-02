@@ -1,0 +1,119 @@
+{
+  "data": {
+    "summary": {
+      "files_considered": 1284,
+      "size_candidates": 3,
+      "partial_hash_candidates": 2,
+      "duplicate_groups": 1,
+      "duplicate_copies": 2,
+      "reclaimable_estimate_bytes": 2502656
+    },
+    "findings": [
+      {
+        "id": "dup-64731b5cc4fd",
+        "kind": "duplicate_group",
+        "target": "sha256:49a4e69a0038aaab493b9605d21d7add1df8519e18d76c621fa0d6f9e98eb35b",
+        "logical_bytes": 5000000,
+        "allocated_bytes": 5005312,
+        "reclaimable_estimate_bytes": 2502656,
+        "caveats": [
+          "apfs_clone_or_shared_extent",
+          "hard_links_merged"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "duplicate-remove-extra-copies@dup-64731b5cc4fd"
+        ],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "content_sha256": "49a4e69a0038aaab493b9605d21d7add1df8519e18d76c621fa0d6f9e98eb35b",
+          "partial_sha256": "5dd22d115288887b67c16d90c1422369b3281a9dc1ff6dc6316809061e4584d9",
+          "file_logical_bytes": 2500000,
+          "copy_count": 2,
+          "files": [
+            {
+              "path": "/Users/example/Downloads/report (1).pdf",
+              "allocated_bytes": 2502656,
+              "hard_link_paths": []
+            },
+            {
+              "path": "/Users/example/Downloads/report.pdf",
+              "allocated_bytes": 2502656,
+              "hard_link_paths": [
+                "/Users/example/Downloads/archive/report-link.pdf"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "suggestions": [
+      {
+        "id": "duplicate-remove-extra-copies@dup-64731b5cc4fd",
+        "command": "rm -- '/Users/example/Downloads/report.pdf' && rm -- '/Users/example/Downloads/archive/report-link.pdf'",
+        "risk": "high",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Identical content. The command keeps '/Users/example/Downloads/report (1).pdf' only because it sorts first; the owner chooses which copy to keep. Every name of a removed copy is listed, because removing one hard-link name frees nothing.",
+        "finding_ids": [
+          "dup-64731b5cc4fd"
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "duplicates scan",
+    "captured_at": "2026-11-02T09:30:00Z",
+    "status": "partial",
+    "scope": {
+      "roots": [
+        {
+          "path": "/Users/example/Downloads",
+          "given": "~/Downloads",
+          "st_dev": 16777234
+        }
+      ],
+      "options": {
+        "compare": null,
+        "min_size": 0,
+        "recursive": true
+      },
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": 0.734,
+      "content_bytes_read": 5196608,
+      "entries_visited": 1391,
+      "subprocess_calls": 0,
+      "subprocess_stdout_bytes": 0,
+      "subprocess_content_bytes_read": 0,
+      "notes": {}
+    },
+    "incomplete_coverage": [
+      {
+        "path": "/Users/example/Downloads/iCloud Export/notes.zip",
+        "reason": "dataless",
+        "errno": null,
+        "operation": "lstat"
+      },
+      {
+        "path": "/Users/example/Downloads/video-render.mov",
+        "reason": "changed_during_scan",
+        "errno": null,
+        "operation": "hash"
+      }
+    ],
+    "unavailable_sources": []
+  }
+}

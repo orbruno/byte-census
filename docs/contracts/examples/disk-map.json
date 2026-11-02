@@ -1,0 +1,388 @@
+{
+  "data": {
+    "summary": {
+      "root_count": 1,
+      "finding_count": 10
+    },
+    "findings": [
+      {
+        "id": "map-9d76086e8899",
+        "kind": "root_total",
+        "target": "/System/Volumes/Data/Users/example",
+        "logical_bytes": 521877004331,
+        "allocated_bytes": 498221309952,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "given": "/Users/example",
+          "nested": false,
+          "counted": true
+        }
+      },
+      {
+        "id": "map-d3127bb9c348",
+        "kind": "first_level",
+        "target": "/System/Volumes/Data/Users/example/Documents",
+        "logical_bytes": 199004221337,
+        "allocated_bytes": 201330118656,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "/System/Volumes/Data/Users/example"
+        }
+      },
+      {
+        "id": "map-560a7588aca5",
+        "kind": "first_level",
+        "target": "/System/Volumes/Data/Users/example/Library",
+        "logical_bytes": 214001337004,
+        "allocated_bytes": 187114004480,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "/System/Volumes/Data/Users/example"
+        }
+      },
+      {
+        "id": "map-aa296d47cc3c",
+        "kind": "first_level",
+        "target": "/System/Volumes/Data/Users/example/Downloads",
+        "logical_bytes": 60998112005,
+        "allocated_bytes": 61002334208,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "/System/Volumes/Data/Users/example"
+        }
+      },
+      {
+        "id": "map-af6c0c5bc06d",
+        "kind": "large_file",
+        "target": "/System/Volumes/Data/Users/example/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+        "logical_bytes": 68719476736,
+        "allocated_bytes": 21474840576,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "sparse_file"
+        ],
+        "see_check": "docker scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "/System/Volumes/Data/Users/example"
+        }
+      },
+      {
+        "id": "map-83d450408450",
+        "kind": "large_file",
+        "target": "/System/Volumes/Data/Users/example/Downloads/ubuntu-24.04-desktop-amd64.iso",
+        "logical_bytes": 6114656256,
+        "allocated_bytes": 6114660352,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "/System/Volumes/Data/Users/example"
+        }
+      },
+      {
+        "id": "map-3c1b6bb1df43",
+        "kind": "category",
+        "target": "/System/Volumes/Data/Users/example/Library/Application Support",
+        "logical_bytes": 55310224001,
+        "allocated_bytes": 52001337344,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "inside_other_scope"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Application support",
+          "counted": false,
+          "overlap": "inside_scan_root"
+        }
+      },
+      {
+        "id": "map-4a4537a870f4",
+        "kind": "category",
+        "target": "/System/Volumes/Data/Applications",
+        "logical_bytes": 40110032177,
+        "allocated_bytes": 41220960256,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Applications",
+          "counted": true,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-43a5bc6ba843",
+        "kind": "category",
+        "target": "/System/Volumes/Data/Users/example/Library/Caches",
+        "logical_bytes": 17201004118,
+        "allocated_bytes": 17412903424,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "inside_other_scope"
+        ],
+        "see_check": "caches scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "User caches",
+          "counted": false,
+          "overlap": "inside_scan_root"
+        }
+      },
+      {
+        "id": "map-e6528bc18d5e",
+        "kind": "tool_cache",
+        "target": "/System/Volumes/Data/Users/example/.cache/uv",
+        "logical_bytes": 9870331201,
+        "allocated_bytes": 9912221696,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "inside_other_scope"
+        ],
+        "see_check": "caches scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "uv",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": "uv",
+          "counted": false,
+          "overlap": "inside_scan_root"
+        }
+      }
+    ],
+    "reconciliation": {
+      "df_command": "df -k /System/Volumes/Data",
+      "df_used_bytes": 627110813696,
+      "measured_allocated_bytes": 539442270208,
+      "delta_bytes": 87668543488,
+      "overcount": false,
+      "counted_findings": [
+        "map-9d76086e8899",
+        "map-4a4537a870f4"
+      ],
+      "note": "Signed delta: df used minus measured. Negative means overcount and is never clamped."
+    },
+    "system": {
+      "df_data_volume": {
+        "mount": "/System/Volumes/Data",
+        "total_bytes": 994662584320,
+        "used_bytes": 627110813696,
+        "available_bytes": 350108332032
+      },
+      "df_system_volume": {
+        "mount": "/",
+        "used_bytes": 12015828992
+      },
+      "diskutil": {
+        "volume_name": "Macintosh HD",
+        "file_system_personality": "APFS",
+        "container_total_space": "994.7 GB (994662584320 Bytes)",
+        "container_free_space": "350.1 GB (350108332032 Bytes)"
+      },
+      "local_snapshot_count": 2,
+      "docker_informational": {
+        "available": true,
+        "docker_reported_size_bytes": 11784600000,
+        "summed_into_host_totals": false,
+        "see_check": "docker scan"
+      }
+    },
+    "tree": {
+      "depth": 4,
+      "min_bytes": 104857600,
+      "roots": [
+        {
+          "path": "/System/Volumes/Data/Users/example",
+          "allocated_bytes": 498221309952,
+          "children": [
+            {
+              "path": "/System/Volumes/Data/Users/example/Documents",
+              "allocated_bytes": 201330118656,
+              "children": [
+                {
+                  "path": "/System/Volumes/Data/Users/example/Documents/Projects",
+                  "allocated_bytes": 88120004608,
+                  "children": [
+                    {
+                      "path": "/System/Volumes/Data/Users/example/Documents/Projects/web-app",
+                      "allocated_bytes": 1240002560,
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "path": "/System/Volumes/Data/Users/example/Documents/Media",
+                  "allocated_bytes": 74002112512,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "path": "/System/Volumes/Data/Users/example/Library",
+              "allocated_bytes": 187114004480,
+              "children": [
+                {
+                  "path": "/System/Volumes/Data/Users/example/Library/Containers",
+                  "allocated_bytes": 34771120128,
+                  "children": []
+                },
+                {
+                  "path": "/System/Volumes/Data/Users/example/Library/Caches",
+                  "allocated_bytes": 17412903424,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "path": "/System/Volumes/Data/Users/example/Downloads",
+              "allocated_bytes": 61002334208,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    "suggestions": []
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "disk map",
+    "captured_at": "2026-11-02T09:30:00Z",
+    "status": "partial",
+    "scope": {
+      "roots": [
+        {
+          "path": "/System/Volumes/Data/Users/example",
+          "given": "/Users/example",
+          "st_dev": 16777234
+        }
+      ],
+      "options": {
+        "top": 30,
+        "large_file_min_mb": 500,
+        "skip_categories": false,
+        "tree_depth": 4,
+        "tree_min_mb": 100
+      },
+      "skipped_mounts": [
+        "/System/Volumes/Data/Users/example/mnt/backup-image"
+      ]
+    },
+    "cost": {
+      "elapsed_s": 48.906,
+      "content_bytes_read": 0,
+      "entries_visited": 2914330,
+      "subprocess_calls": 8,
+      "subprocess_stdout_bytes": 2861,
+      "subprocess_content_bytes_read": null,
+      "notes": {
+        "subprocess_content_bytes_read": "Reads performed inside external commands cannot be measured from this process."
+      }
+    },
+    "incomplete_coverage": [
+      {
+        "path": "/System/Volumes/Data/Users/example/Library/Mail",
+        "reason": "privacy_denied",
+        "errno": "EPERM",
+        "operation": "scandir"
+      },
+      {
+        "path": "/System/Volumes/Data/Users/example/Library/Messages",
+        "reason": "privacy_denied",
+        "errno": "EPERM",
+        "operation": "scandir"
+      }
+    ],
+    "unavailable_sources": []
+  }
+}

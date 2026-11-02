@@ -1,0 +1,129 @@
+{
+  "data": {
+    "summary": {
+      "artifact_count": 2,
+      "total_allocated_bytes": 953049088
+    },
+    "findings": [
+      {
+        "id": "art-e164e4cf9b16",
+        "kind": "artifact",
+        "target": "/Users/example/Projects/web-app/node_modules",
+        "logical_bytes": 512330118,
+        "allocated_bytes": 618708992,
+        "reclaimable_estimate_bytes": 618708992,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "artifact-remove-regenerate@art-e164e4cf9b16"
+        ],
+        "classification": {
+          "owner": "/Users/example/Projects/web-app",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "artifact_kind": "node_modules",
+          "project": "/Users/example/Projects/web-app",
+          "regenerate_command": "npm install",
+          "project_mtime": "2026-10-21T16:04:55Z"
+        }
+      },
+      {
+        "id": "art-2536ebd8bc61",
+        "kind": "artifact",
+        "target": "/Users/example/Projects/api/.venv",
+        "logical_bytes": 301442009,
+        "allocated_bytes": 334340096,
+        "reclaimable_estimate_bytes": 334340096,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "artifact-remove-regenerate@art-2536ebd8bc61"
+        ],
+        "classification": {
+          "owner": "/Users/example/Projects/api",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "artifact_kind": ".venv",
+          "project": "/Users/example/Projects/api",
+          "regenerate_command": "uv sync",
+          "project_mtime": "2026-10-30T09:12:03Z"
+        }
+      }
+    ],
+    "suggestions": [
+      {
+        "id": "artifact-remove-regenerate@art-2536ebd8bc61",
+        "command": "rm -rf -- '/Users/example/Projects/api/.venv' && cd -- '/Users/example/Projects/api' && uv sync",
+        "risk": "medium",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": ".venv is regenerable with `uv sync`; removal frees at most its allocated size.",
+        "finding_ids": [
+          "art-2536ebd8bc61"
+        ]
+      },
+      {
+        "id": "artifact-remove-regenerate@art-e164e4cf9b16",
+        "command": "rm -rf -- '/Users/example/Projects/web-app/node_modules' && cd -- '/Users/example/Projects/web-app' && npm install",
+        "risk": "medium",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "node_modules is regenerable with `npm install`; removal frees at most its allocated size.",
+        "finding_ids": [
+          "art-e164e4cf9b16"
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "artifacts scan",
+    "captured_at": "2026-11-02T09:30:00Z",
+    "status": "partial",
+    "scope": {
+      "roots": [
+        {
+          "path": "/Users/example/Projects",
+          "given": "~/Projects",
+          "st_dev": 16777234
+        }
+      ],
+      "options": {},
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": 2.977,
+      "content_bytes_read": 0,
+      "entries_visited": 96118,
+      "subprocess_calls": 0,
+      "subprocess_stdout_bytes": 0,
+      "subprocess_content_bytes_read": 0,
+      "notes": {}
+    },
+    "incomplete_coverage": [
+      {
+        "path": "/Users/example/Projects/legacy/private",
+        "reason": "permission_denied",
+        "errno": "EACCES",
+        "operation": "scandir"
+      }
+    ],
+    "unavailable_sources": []
+  }
+}

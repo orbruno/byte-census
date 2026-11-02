@@ -1,0 +1,192 @@
+{
+  "data": {
+    "summary": {
+      "cache_dir_count": 3,
+      "tool_cache_count": 1,
+      "total_allocated_bytes": 16271142912,
+      "top": 20,
+      "shown": 4,
+      "truncated": false
+    },
+    "findings": [
+      {
+        "id": "cch-601a44f92b4a",
+        "kind": "tool_cache",
+        "target": "/Users/example/.cache/uv",
+        "logical_bytes": 9870331201,
+        "allocated_bytes": 9912221696,
+        "reclaimable_estimate_bytes": 9912221696,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "uv-cache-prune"
+        ],
+        "classification": {
+          "owner": "uv",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": "uv",
+          "location_source": "uv cache dir"
+        }
+      },
+      {
+        "id": "cch-df0cc54e92ba",
+        "kind": "cache_dir",
+        "target": "/Users/example/Library/Caches/Homebrew",
+        "logical_bytes": 3112402331,
+        "allocated_bytes": 3141394432,
+        "reclaimable_estimate_bytes": 3141394432,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "brew-cleanup"
+        ],
+        "classification": {
+          "owner": "brew",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": "brew",
+          "location_source": "brew --cache"
+        }
+      },
+      {
+        "id": "cch-8eb49d686277",
+        "kind": "cache_dir",
+        "target": "/Users/example/Library/Caches/com.spotify.client",
+        "logical_bytes": 2201337102,
+        "allocated_bytes": 2206973952,
+        "reclaimable_estimate_bytes": 2206973952,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": null,
+          "location_source": "child of ~/Library/Caches"
+        }
+      },
+      {
+        "id": "cch-8aa463bbcc07",
+        "kind": "cache_dir",
+        "target": "/Users/example/Library/Caches/Google",
+        "logical_bytes": 1004221003,
+        "allocated_bytes": 1010552832,
+        "reclaimable_estimate_bytes": 1010552832,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": null,
+          "location_source": "child of ~/Library/Caches"
+        }
+      }
+    ],
+    "suggestions": [
+      {
+        "id": "brew-cleanup",
+        "command": "brew cleanup",
+        "risk": "low",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Removes outdated downloads and old formula versions from the Homebrew cache.",
+        "finding_ids": [
+          "cch-df0cc54e92ba"
+        ]
+      },
+      {
+        "id": "uv-cache-prune",
+        "command": "uv cache prune",
+        "risk": "low",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Removes unused entries from the uv cache; uv downloads them again when needed.",
+        "finding_ids": [
+          "cch-601a44f92b4a"
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "caches scan",
+    "captured_at": "2026-11-02T09:30:00Z",
+    "status": "partial",
+    "scope": {
+      "roots": [
+        {
+          "path": "/Users/example/Library/Caches",
+          "given": "~/Library/Caches",
+          "st_dev": 16777234
+        },
+        {
+          "path": "/Users/example/.cache/uv",
+          "given": "uv cache dir",
+          "st_dev": 16777234
+        }
+      ],
+      "options": {
+        "top": 20
+      },
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": 6.214,
+      "content_bytes_read": 0,
+      "entries_visited": 412337,
+      "subprocess_calls": 2,
+      "subprocess_stdout_bytes": 74,
+      "subprocess_content_bytes_read": null,
+      "notes": {
+        "subprocess_content_bytes_read": "Reads performed inside external commands cannot be measured from this process."
+      }
+    },
+    "incomplete_coverage": [
+      {
+        "path": "/Users/example/Library/Caches/com.apple.HomeKit",
+        "reason": "privacy_denied",
+        "errno": "EPERM",
+        "operation": "scandir"
+      }
+    ],
+    "unavailable_sources": [
+      {
+        "source": "npm",
+        "reason": "not_installed",
+        "detail": "npm was not found on PATH; its cache was not measured."
+      }
+    ]
+  }
+}
