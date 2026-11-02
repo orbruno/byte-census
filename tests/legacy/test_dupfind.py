@@ -11,6 +11,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from byte_census.legacy.dupfind import find
+from byte_census.legacy.formatting import calculate_statistics, format_json_output
 from byte_census.legacy.hashing import calculate_hash
 from byte_census.legacy.scan import (
     collect_files,
@@ -144,6 +145,87 @@ class DuplicateFinderTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 1)
         self.assertIn("Cannot write output file", result.stderr)
         self.assertNotIn("Traceback", result.output)
+
+    def _invoke_with_output(self, name: str, output_path: Path):
+        self.write_file(f"{name}/first.txt", b"duplicate")
+        self.write_file(f"{name}/second.txt", b"duplicate")
+        return self.runner.invoke(
+            find,
+            [
+                str(self.root / name),
+                "--quiet",
+                "--format",
+                "json",
+                "--output",
+                str(output_path),
+            ],
+        )
+
+    def test_existing_output_file_exits_3_without_overwriting(self) -> None:
+        output_path = self.root / "existing.json"
+        output_path.write_text("keep me", encoding="utf-8")
+
+        result = self._invoke_with_output("exists", output_path)
+
+        self.assertEqual(result.exit_code, 3, result.output)
+        self.assertIn(str(output_path), result.stderr)
+        self.assertIn("already exists", result.stderr)
+        self.assertIn("remove", result.stderr)
+        self.assertNotIn("Traceback", result.output)
+
+    def test_existing_output_file_content_is_unchanged(self) -> None:
+        output_path = self.root / "existing.json"
+        output_path.write_text("keep me", encoding="utf-8")
+
+        self._invoke_with_output("unchanged", output_path)
+
+        self.assertEqual(output_path.read_text(encoding="utf-8"), "keep me")
+
+    def test_output_symlink_exits_3_without_following(self) -> None:
+        target = self.root / "target.json"
+        target.write_text("keep me", encoding="utf-8")
+        link = self.root / "link.json"
+        link.symlink_to(target)
+        dangling = self.root / "dangling.json"
+        dangling.symlink_to(self.root / "nowhere.json")
+
+        for path in (link, dangling):
+            result = self._invoke_with_output("symlink", path)
+            self.assertEqual(result.exit_code, 3, result.output)
+            self.assertTrue(path.is_symlink())
+
+        self.assertEqual(target.read_text(encoding="utf-8"), "keep me")
+        self.assertFalse((self.root / "nowhere.json").exists())
+
+    def test_deprecation_notice_goes_to_stderr_only(self) -> None:
+        self.write_file("notice/first.txt", b"duplicate")
+        self.write_file("notice/second.txt", b"duplicate")
+        notice = (
+            "dupfind is deprecated; use 'byte-census duplicates scan'. "
+            "It will be removed in 3.0.0."
+        )
+
+        result = self.runner.invoke(
+            find, [str(self.root / "notice"), "--quiet", "--format", "json"]
+        )
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn(notice, result.stderr)
+        self.assertNotIn("deprecated", result.stdout)
+
+    def test_json_stdout_is_unchanged_by_the_notice(self) -> None:
+        self.write_file("same/first.txt", b"duplicate")
+        self.write_file("same/second.txt", b"duplicate")
+        duplicates, _, scanned = find_duplicates_single(self.root / "same", quiet=True)
+        expected = format_json_output(
+            duplicates, calculate_statistics(duplicates, scanned)
+        )
+
+        result = self.runner.invoke(
+            find, [str(self.root / "same"), "--quiet", "--format", "json"]
+        )
+
+        self.assertEqual(result.stdout, expected + "\n")
 
     def test_negative_minimum_size_is_rejected(self) -> None:
         self.write_file("minimum/file.txt", b"content")

@@ -4,6 +4,14 @@ All notable changes to this project are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- `dupfind --output FILE` now creates the file exclusively. An existing file or
+  a symlink (dangling or not) at the path exits 3, writes nothing, and names the
+  path on stderr; there is no `--force`. A missing parent directory still exits 1.
+- `dupfind` prints a deprecation notice on stderr (also with `--quiet`); stdout is
+  unchanged. The adapter will be removed in 3.0.0.
+
 ### Added
 
 - Snapshot test helper (`tests/support/snapshots.py`) that normalizes

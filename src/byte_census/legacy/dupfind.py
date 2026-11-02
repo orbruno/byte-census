@@ -16,6 +16,11 @@ from byte_census.legacy.formatting import (
 from byte_census.legacy.report_writer import write_report
 from byte_census.legacy.scan import find_duplicates_compare, find_duplicates_single
 
+DEPRECATION_NOTICE = (
+    "dupfind is deprecated; use 'byte-census duplicates scan'. "
+    "It will be removed in 3.0.0."
+)
+
 EXAMPLES = """\
 Example:
 
@@ -95,6 +100,7 @@ def find(
 
     PATH is the directory to scan for duplicates.
     """
+    click.echo(DEPRECATION_NOTICE, err=True)
     try:
         if compare:
             duplicates, errors, files_scanned = find_duplicates_compare(
