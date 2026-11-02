@@ -8,7 +8,7 @@ profile: compact
 title: "Report Docker disk usage, images, and stopped containers"
 parent: null
 points: 3
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -46,7 +46,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commit 1aefee2: four allowlisted docker argvs through the runner, exit 4 when the daemon or CLI is unavailable, Docker-reported sizes never summed; docker never executed in tests. Independent review pending.
+- Closure: held open until the first CI run is green.
 
 ---
 Last Updated: 2026-11-02

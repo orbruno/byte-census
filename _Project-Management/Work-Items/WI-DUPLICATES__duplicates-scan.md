@@ -8,7 +8,7 @@ profile: full
 title: "Find duplicates with size, partial-hash, and full-hash stages"
 parent: null
 points: 5
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -64,7 +64,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commit 4fde168: three-stage hashing with exact content_bytes_read verified against an os.read spy; 51 tests. Independent review pending.
+- Closure: held open until the first CI run is green.
 
 ---
 Last Updated: 2026-11-02

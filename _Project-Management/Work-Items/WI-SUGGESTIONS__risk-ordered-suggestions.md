@@ -8,7 +8,7 @@ profile: compact
 title: "Provide the risk-ordered cleanup suggestion catalog"
 parent: null
 points: 2
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -45,7 +45,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commits f2eab38, f80893c, a211346: catalog matching the contract examples; review READY with hardening applied (order-independent FrozenMap hash, fixed regeneration commands, kept-copy guard, ANSI-C quoting, runtime isolation test).
+- Closure: held open until the first CI run is green.
 
 ---
 Last Updated: 2026-11-02

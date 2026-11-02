@@ -8,7 +8,7 @@ profile: compact
 title: "Report the largest user and tool caches"
 parent: null
 points: 3
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -46,7 +46,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commit 3b9d786: complete totals before --top, uv and brew through the runner, npm resolved from configuration; 41 tests; smoke run 24.95 s over 787,984 entries. Process deviation: tests were written after the code (DOD-01 is met by the same commit, the TDD rule was not). Independent review pending.
+- Closure: held open until the first CI run is green.
 
 ---
 Last Updated: 2026-11-02

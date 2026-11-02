@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: dashboard
-source_fingerprint: sha256:53783f7e8e41cac8084af177c8e8aa43db34afa065b6813535e949de8e058278
+source_fingerprint: sha256:c89b85d8c8a73212ff538fcf79f5625c8be83e61a6b700fde70c97467dbde7c9
 ---
 
 # Project Management Dashboard - duplicate-finder-cli
@@ -46,14 +46,14 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 | [WI-CONTRACTS](Work-Items/WI-CONTRACTS__observation-contracts-and-parity.md) | decision | - | Define the observation contracts, parity matrix, and ADR-002 adaptations | A | 2 | 5 | in_progress |
 | [WI-RENAME](Work-Items/WI-RENAME__rename-package-and-binary.md) | enabler | - | Move to a src layout with byte-census and dupfind entry points | A | 3 | 3 | in_progress |
 | [WI-QUALITY](Work-Items/WI-QUALITY__quality-infrastructure.md) | enabler | - | Provide snapshot, coverage, and CI infrastructure | A | 4 | 2 | in_progress |
-| [WI-SAFETY](Work-Items/WI-SAFETY__read-only-safety.md) | enabler | - | Enforce the read-only guarantee in code and tests | A | 5 | 5 | proposed |
-| [WI-CORE](Work-Items/WI-CORE__observation-core.md) | enabler | - | Provide the observation model, cost meter, errors, and rendering | A | 6 | 8 | proposed |
-| [WI-SUGGESTIONS](Work-Items/WI-SUGGESTIONS__risk-ordered-suggestions.md) | story | - | Provide the risk-ordered cleanup suggestion catalog | A | 7 | 2 | proposed |
-| [WI-DUPLICATES](Work-Items/WI-DUPLICATES__duplicates-scan.md) | story | - | Find duplicates with size, partial-hash, and full-hash stages | A | 8 | 5 | proposed |
-| [WI-LEGACY-ADAPTER](Work-Items/WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md) | enabler | - | Keep dupfind as a frozen v1 command with safe report output | A | 9 | 2 | proposed |
-| [WI-ARTIFACTS](Work-Items/WI-ARTIFACTS__artifacts-scan.md) | story | - | Report regenerable development artifacts | B | 1 | 3 | proposed |
-| [WI-CACHES](Work-Items/WI-CACHES__caches-scan.md) | story | - | Report the largest user and tool caches | B | 2 | 3 | proposed |
-| [WI-DOCKER](Work-Items/WI-DOCKER__docker-scan.md) | story | - | Report Docker disk usage, images, and stopped containers | B | 3 | 3 | proposed |
+| [WI-SAFETY](Work-Items/WI-SAFETY__read-only-safety.md) | enabler | - | Enforce the read-only guarantee in code and tests | A | 5 | 5 | in_progress |
+| [WI-CORE](Work-Items/WI-CORE__observation-core.md) | enabler | - | Provide the observation model, cost meter, errors, and rendering | A | 6 | 8 | in_progress |
+| [WI-SUGGESTIONS](Work-Items/WI-SUGGESTIONS__risk-ordered-suggestions.md) | story | - | Provide the risk-ordered cleanup suggestion catalog | A | 7 | 2 | in_progress |
+| [WI-DUPLICATES](Work-Items/WI-DUPLICATES__duplicates-scan.md) | story | - | Find duplicates with size, partial-hash, and full-hash stages | A | 8 | 5 | in_progress |
+| [WI-LEGACY-ADAPTER](Work-Items/WI-LEGACY-ADAPTER__dupfind-legacy-adapter.md) | enabler | - | Keep dupfind as a frozen v1 command with safe report output | A | 9 | 2 | in_progress |
+| [WI-ARTIFACTS](Work-Items/WI-ARTIFACTS__artifacts-scan.md) | story | - | Report regenerable development artifacts | B | 1 | 3 | in_progress |
+| [WI-CACHES](Work-Items/WI-CACHES__caches-scan.md) | story | - | Report the largest user and tool caches | B | 2 | 3 | in_progress |
+| [WI-DOCKER](Work-Items/WI-DOCKER__docker-scan.md) | story | - | Report Docker disk usage, images, and stopped containers | B | 3 | 3 | in_progress |
 | [WI-DISK-MAP](Work-Items/WI-DISK-MAP__disk-map-traversal-and-reconciliation.md) | story | - | Map scan roots and reconcile them against df | B | 4 | 5 | proposed |
 | [WI-DISK-MAP-CATEGORIES](Work-Items/WI-DISK-MAP-CATEGORIES__disk-map-categories.md) | story | - | Add macOS categories and system context to the disk map | B | 5 | 3 | proposed |
 | [WI-DISK-MAP-TREE](Work-Items/WI-DISK-MAP-TREE__disk-map-tree-and-parity.md) | story | - | Add the folder tree and prove parity with the replaced collector | B | 6 | 3 | proposed |

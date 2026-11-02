@@ -8,7 +8,7 @@ profile: compact
 title: "Report regenerable development artifacts"
 parent: null
 points: 3
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -47,7 +47,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commit 32e6a46: pruned discovery with dataless and st_dev checks, per-artifact sizing, fixed regeneration suggestions; 30 tests; smoke run 0.037 s. Independent review pending.
+- Closure: held open until the first CI run is green.
 
 ---
 Last Updated: 2026-11-02

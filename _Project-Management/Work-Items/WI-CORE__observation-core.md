@@ -8,7 +8,7 @@ profile: full
 title: "Provide the observation model, cost meter, errors, and rendering"
 parent: null
 points: 8
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -66,7 +66,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commits f16aec1, e977705: model, cost meter, errors, renderers, command scaffold; all contract examples rebuild byte-identically. Review BLOCKED (elapsed_s end point, pickling, stderr on interrupt, snapshot masking) and re-review READY.
+- Closure: held open until the first CI run is green.
 
 ---
 Last Updated: 2026-11-02

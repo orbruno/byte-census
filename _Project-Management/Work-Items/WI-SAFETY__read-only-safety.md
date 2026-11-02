@@ -8,7 +8,7 @@ profile: full
 title: "Enforce the read-only guarantee in code and tests"
 parent: null
 points: 5
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -64,7 +64,8 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commits 83666cb, 6f372f7, 1ea1ffd, d687f6f, b678063: runner with exact argv and pinned tools, fsread safe reads, paths, allowlist AST guard. Three security review rounds (BLOCKED, BLOCKED, BLOCKED) drove npm removal, an attribute allowlist and the documented threat model; closing review pending.
+- Closure: held open until the first CI run is green.
 
 ---
 Last Updated: 2026-11-02
