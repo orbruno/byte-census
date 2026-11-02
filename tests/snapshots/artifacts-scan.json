@@ -1,0 +1,200 @@
+{
+  "data": {
+    "summary": {
+      "artifact_count": 4,
+      "total_allocated_bytes": 28672
+    },
+    "findings": [
+      {
+        "id": "art-<ID1>",
+        "kind": "artifact",
+        "target": "<ROOT>/rust/target",
+        "logical_bytes": 9000,
+        "allocated_bytes": 12288,
+        "reclaimable_estimate_bytes": 12288,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "artifact-remove-regenerate@art-<ID1>"
+        ],
+        "classification": {
+          "owner": "<ROOT>/rust",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "artifact_kind": "target",
+          "project": "<ROOT>/rust",
+          "regenerate_command": "cargo build",
+          "project_mtime": "2023-11-14T22:13:20Z"
+        }
+      },
+      {
+        "id": "art-<ID2>",
+        "kind": "artifact",
+        "target": "<ROOT>/web/node_modules",
+        "logical_bytes": 5000,
+        "allocated_bytes": 8192,
+        "reclaimable_estimate_bytes": 8192,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "artifact-remove-regenerate@art-<ID2>"
+        ],
+        "classification": {
+          "owner": "<ROOT>/web",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "artifact_kind": "node_modules",
+          "project": "<ROOT>/web",
+          "regenerate_command": "npm install",
+          "project_mtime": "2023-11-14T22:13:20Z"
+        }
+      },
+      {
+        "id": "art-<ID3>",
+        "kind": "artifact",
+        "target": "<ROOT>/api/.venv",
+        "logical_bytes": 3000,
+        "allocated_bytes": 4096,
+        "reclaimable_estimate_bytes": 4096,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "artifact-remove-regenerate@art-<ID3>"
+        ],
+        "classification": {
+          "owner": "<ROOT>/api",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "artifact_kind": ".venv",
+          "project": "<ROOT>/api",
+          "regenerate_command": "uv sync",
+          "project_mtime": "2023-11-14T22:13:20Z"
+        }
+      },
+      {
+        "id": "art-<ID4>",
+        "kind": "artifact",
+        "target": "<ROOT>/old/venv",
+        "logical_bytes": 100,
+        "allocated_bytes": 4096,
+        "reclaimable_estimate_bytes": 4096,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "artifact-remove-regenerate@art-<ID4>"
+        ],
+        "classification": {
+          "owner": "<ROOT>/old",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "artifact_kind": "venv",
+          "project": "<ROOT>/old",
+          "regenerate_command": "uv sync",
+          "project_mtime": "2023-11-14T22:13:20Z"
+        }
+      }
+    ],
+    "suggestions": [
+      {
+        "id": "artifact-remove-regenerate@art-<ID1>",
+        "command": "rm -rf -- '<ROOT>/rust/target' && cd -- '<ROOT>/rust' && cargo build",
+        "risk": "medium",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "target is regenerable with `cargo build`; removal frees at most its allocated size.",
+        "finding_ids": [
+          "art-<ID1>"
+        ]
+      },
+      {
+        "id": "artifact-remove-regenerate@art-<ID2>",
+        "command": "rm -rf -- '<ROOT>/web/node_modules' && cd -- '<ROOT>/web' && npm install",
+        "risk": "medium",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "node_modules is regenerable with `npm install`; removal frees at most its allocated size.",
+        "finding_ids": [
+          "art-<ID2>"
+        ]
+      },
+      {
+        "id": "artifact-remove-regenerate@art-<ID3>",
+        "command": "rm -rf -- '<ROOT>/api/.venv' && cd -- '<ROOT>/api' && uv sync",
+        "risk": "medium",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": ".venv is regenerable with `uv sync`; removal frees at most its allocated size.",
+        "finding_ids": [
+          "art-<ID3>"
+        ]
+      },
+      {
+        "id": "artifact-remove-regenerate@art-<ID4>",
+        "command": "rm -rf -- '<ROOT>/old/venv' && cd -- '<ROOT>/old' && uv sync",
+        "risk": "medium",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "venv is regenerable with `uv sync`; removal frees at most its allocated size.",
+        "finding_ids": [
+          "art-<ID4>"
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "artifacts scan",
+    "captured_at": "<CAPTURED_AT>",
+    "status": "complete",
+    "scope": {
+      "roots": [
+        {
+          "path": "<ROOT>",
+          "given": "<ROOT>",
+          "st_dev": "<ST_DEV>"
+        }
+      ],
+      "options": {},
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": "<ELAPSED_S>",
+      "content_bytes_read": 0,
+      "entries_visited": 19,
+      "subprocess_calls": 0,
+      "subprocess_stdout_bytes": 0,
+      "subprocess_content_bytes_read": 0,
+      "notes": {}
+    },
+    "incomplete_coverage": [],
+    "unavailable_sources": []
+  }
+}

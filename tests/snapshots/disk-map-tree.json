@@ -1,0 +1,50 @@
+{
+  "depth": 4,
+  "min_bytes": 0,
+  "roots": [
+    {
+      "path": "<ROOT>/Users/example/Projects",
+      "allocated_bytes": 573440,
+      "children": [
+        {
+          "path": "<ROOT>/Users/example/Projects/big",
+          "allocated_bytes": 405504,
+          "children": [
+            {
+              "path": "<ROOT>/Users/example/Projects/big/a",
+              "allocated_bytes": 405504,
+              "children": [
+                {
+                  "path": "<ROOT>/Users/example/Projects/big/a/b",
+                  "allocated_bytes": 303104,
+                  "children": [
+                    {
+                      "path": "<ROOT>/Users/example/Projects/big/a/b/c",
+                      "allocated_bytes": 303104,
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "<ROOT>/Users/example/Projects/mid",
+          "allocated_bytes": 151552,
+          "children": []
+        },
+        {
+          "path": "<ROOT>/Users/example/Projects/small",
+          "allocated_bytes": 8192,
+          "children": []
+        },
+        {
+          "path": "<ROOT>/Users/example/Projects/empty",
+          "allocated_bytes": 0,
+          "children": []
+        }
+      ]
+    }
+  ]
+}

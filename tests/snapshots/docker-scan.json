@@ -1,0 +1,267 @@
+{
+  "data": {
+    "summary": {
+      "informational": true,
+      "daemon_available": true,
+      "dangling_image_count": 1,
+      "stopped_container_count": 2,
+      "docker_reported_size_bytes": 11784600000,
+      "docker_reported_reclaimable_bytes": 6222300000,
+      "note": "Docker-reported figures; never added to host filesystem totals."
+    },
+    "findings": [
+      {
+        "id": "dkr-<ID1>",
+        "kind": "docker_type",
+        "target": "docker:Images",
+        "logical_bytes": null,
+        "allocated_bytes": null,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "docker_reported_not_host"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "docker-image-prune",
+          "docker-system-prune-all"
+        ],
+        "classification": {
+          "owner": "docker",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "docker_type": "Images",
+          "total_count": 12,
+          "active_count": 5,
+          "docker_reported_size_bytes": 7420000000,
+          "docker_reported_reclaimable_bytes": 3180000000,
+          "raw": {
+            "Size": "7.42GB",
+            "Reclaimable": "3.18GB (42%)"
+          }
+        }
+      },
+      {
+        "id": "dkr-<ID2>",
+        "kind": "docker_type",
+        "target": "docker:Containers",
+        "logical_bytes": null,
+        "allocated_bytes": null,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "docker_reported_not_host"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "docker-container-prune",
+          "docker-system-prune-all"
+        ],
+        "classification": {
+          "owner": "docker",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "docker_type": "Containers",
+          "total_count": 6,
+          "active_count": 2,
+          "docker_reported_size_bytes": 184600000,
+          "docker_reported_reclaimable_bytes": 122300000,
+          "raw": {
+            "Size": "184.6MB",
+            "Reclaimable": "122.3MB (66%)"
+          }
+        }
+      },
+      {
+        "id": "dkr-<ID3>",
+        "kind": "docker_type",
+        "target": "docker:Local Volumes",
+        "logical_bytes": null,
+        "allocated_bytes": null,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "docker_reported_not_host"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "docker-volume-prune"
+        ],
+        "classification": {
+          "owner": "docker",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "docker_type": "Local Volumes",
+          "total_count": 4,
+          "active_count": 2,
+          "docker_reported_size_bytes": 2310000000,
+          "docker_reported_reclaimable_bytes": 1050000000,
+          "raw": {
+            "Size": "2.31GB",
+            "Reclaimable": "1.05GB (45%)"
+          }
+        }
+      },
+      {
+        "id": "dkr-<ID4>",
+        "kind": "docker_type",
+        "target": "docker:Build Cache",
+        "logical_bytes": null,
+        "allocated_bytes": null,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "docker_reported_not_host"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "docker-system-prune-all"
+        ],
+        "classification": {
+          "owner": "docker",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "docker_type": "Build Cache",
+          "total_count": 57,
+          "active_count": 0,
+          "docker_reported_size_bytes": 1870000000,
+          "docker_reported_reclaimable_bytes": 1870000000,
+          "raw": {
+            "Size": "1.87GB",
+            "Reclaimable": "1.87GB"
+          }
+        }
+      }
+    ],
+    "images": [
+      {
+        "repository": "<none>",
+        "tag": "<none>",
+        "image_id": "9a41c0e6b2d8",
+        "docker_reported_size_bytes": 1210000000,
+        "raw_size": "1.21GB",
+        "created_at": "2026-06-02T15:40:03Z"
+      },
+      {
+        "repository": "postgres",
+        "tag": "16",
+        "image_id": "3b2f5c1d9e7a",
+        "docker_reported_size_bytes": 438000000,
+        "raw_size": "438MB",
+        "created_at": "2026-08-14T07:12:40Z"
+      },
+      {
+        "repository": "python",
+        "tag": "3.12-slim",
+        "image_id": "e5d7a8f0c3b1",
+        "docker_reported_size_bytes": 127000000,
+        "raw_size": "127MB",
+        "created_at": "2026-09-30T11:05:17Z"
+      }
+    ],
+    "stopped_containers": [
+      {
+        "name": "api-db-1",
+        "image": "postgres:16",
+        "container_id": "7c1e2a9b4d03",
+        "status": "Exited (0) 3 weeks ago",
+        "created_at": "2026-09-20T08:00:11Z"
+      },
+      {
+        "name": "scratch-run",
+        "image": "python:3.12-slim",
+        "container_id": "a0f3d6b8e912",
+        "status": "Exited (137) 5 days ago",
+        "created_at": "2026-10-27T18:22:45Z"
+      }
+    ],
+    "suggestions": [
+      {
+        "id": "docker-image-prune",
+        "command": "docker image prune",
+        "risk": "low",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Removes dangling images only; Docker reports them as reclaimable.",
+        "finding_ids": [
+          "dkr-<ID1>"
+        ]
+      },
+      {
+        "id": "docker-container-prune",
+        "command": "docker container prune",
+        "risk": "medium",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Removes all stopped containers and their writable layers.",
+        "finding_ids": [
+          "dkr-<ID2>"
+        ]
+      },
+      {
+        "id": "docker-system-prune-all",
+        "command": "docker system prune -a",
+        "risk": "high",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Removes every unused image, stopped container, network, and build cache entry; volumes are kept because the command has no --volumes.",
+        "finding_ids": [
+          "dkr-<ID1>",
+          "dkr-<ID2>",
+          "dkr-<ID4>"
+        ]
+      },
+      {
+        "id": "docker-volume-prune",
+        "command": "docker volume prune",
+        "risk": "high",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Removes unused volumes, which can hold the only copy of application data.",
+        "finding_ids": [
+          "dkr-<ID3>"
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "docker scan",
+    "captured_at": "<CAPTURED_AT>",
+    "status": "complete",
+    "scope": {
+      "roots": [],
+      "options": {},
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": "<ELAPSED_S>",
+      "content_bytes_read": 0,
+      "entries_visited": 0,
+      "subprocess_calls": 4,
+      "subprocess_stdout_bytes": 1127,
+      "subprocess_content_bytes_read": null,
+      "notes": {
+        "subprocess_content_bytes_read": "Reads performed inside external commands cannot be measured from this process."
+      }
+    },
+    "incomplete_coverage": [],
+    "unavailable_sources": []
+  }
+}

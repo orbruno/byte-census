@@ -1,0 +1,216 @@
+# Changelog
+
+All notable changes to this project are recorded here.
+
+## Unreleased
+
+## 2.0.0 - 2026-11-02
+
+### Added
+
+- `byte-census docker scan` drops `docker system df` rows with a blank Type, and reports negative or non-integer TotalCount and Active as null with the raw value kept and a partial status.
+- `byte-census disk map` reports a depth-limited folder tree per scan root
+  (`--tree-depth`, default 4; `--tree-min-mb`, default 100) from the same walk.
+- `byte-census disk map` also measures the ten macOS categories and the uv,
+  npm, and Homebrew caches (counted once against the roots), reports
+  `df -k /`, `diskutil info /`, the local snapshot count, and Docker usage as
+  system context, and accepts `--skip-categories`.
+- `byte-census docker scan` rejects unusable `docker system df` output (exit 4) and reports unparseable fields as null with a partial status; totals are null when any component is unknown.
+- `byte-census disk map --scan-root PATH` measures data-volume roots, their
+  largest first-level folders and large files, and reconciles the total with
+  `df -k /System/Volumes/Data` as a signed delta.
+- `byte-census artifacts scan ROOT` lists `node_modules`, `.venv`, `venv`, and
+  `target` (beside `Cargo.toml`) with allocated size, project, modification
+  time, and a remove-and-regenerate suggestion.
+- `byte-census docker scan` reports Docker-reported disk usage per type, the image inventory, dangling image count, and stopped containers; sizes are never added to host totals, and a missing CLI or stopped daemon exits 4.
+- Suggestion hardening: operands with control characters use `$'...'` quoting,
+  artifact suggestions accept only the fixed regeneration command for their
+  directory (`npm install`, `uv sync`, `cargo build`), duplicate suggestions
+  reject a kept path listed for removal, `FrozenMap` hashes independent of key
+  order, and `freeze` rejects NaN and infinite floats.
+- `byte-census duplicates scan PATH`: duplicate groups found by size, a 64 KiB partial SHA-256, and a full SHA-256 only for partial matches, with hard links merged, `reclaimable_estimate_bytes` from allocated blocks, exact `content_bytes_read`, `--compare`, `--min-size`, and `--recursive/--no-recursive`.
+- `byte-census caches scan`: complete allocated totals for every folder in
+  `~/Library/Caches` plus the uv, npm, and Homebrew caches outside it, cut to
+  `--top` (default 20) only after measuring; a missing tool is an
+  `unavailable_sources` entry, and tool caches carry low-risk catalog suggestions.
+- Cleanup suggestion catalog (`byte_census.suggestions`): nine immutable entries
+  (docker, uv, brew, npm, artifact, duplicate) with risk, reversibility, and
+  reason, pure builders for check-wide and per-finding suggestions, and the
+  low-to-high risk ordering. Suggestions are text only, always require owner
+  authorization, and never reach the runner.
+- Snapshot test helper (`tests/support/snapshots.py`) that normalizes
+  `captured_at`, `cost`, `scope.st_dev`, and fixture roots; snapshots update
+  only with `BYTE_CENSUS_UPDATE_SNAPSHOTS=1`.
+- Coverage gate: `uv run pytest` fails below 80 percent line coverage.
+- GitHub Actions workflow running ruff and the full suite on `macos-latest`.
+- `byte_census.runner`, the only process gateway. It runs an argv only when
+  it exactly matches a row of `docs/contracts/argv-allowlist.md`, with
+  `shell=False`, a per-row timeout, stdin closed, and `LC_ALL=C`; it raises
+  typed errors for rejected argv, missing executables, and timeouts.
+- `byte_census.fsread`, read-only filesystem primitives: content reads
+  `lstat`, require a regular file, open with
+  `O_RDONLY | O_NOFOLLOW | O_NONBLOCK`, and re-check identity with `fstat`.
+  FIFOs, devices, sockets, symlinks, and dataless (`SF_DATALESS`) files are
+  never read. The walker never follows symlinks and never crosses an
+  `st_dev` change.
+- `byte_census.paths.validate_root`, which rejects empty paths, null bytes,
+  control characters, missing paths, and non-directories.
+- AST read-only guard test: process access only in the runner, write
+  operations only in `legacy/report_writer.py`, and `ctypes`, `pty`,
+  `tempfile`, `multiprocessing`, `os.fork`, `os.posix_spawn`, and dynamic
+  `getattr(os, ...)` forbidden everywhere.
+- Test that hashing and walking a fixture tree leave contents and
+  modification times unchanged; reading may update access times.
+- Observation core (WI-CORE): `byte_census.model` with frozen dataclasses for
+  the `{data, meta}` envelope, findings (including classification fields),
+  suggestions, coverage entries, cost, and the error object, serialized in
+  contract field order, plus the contract ordering helpers and the finding ID
+  rule.
+- `byte_census.cost`: one wall-clock `elapsed_s` per command and mergeable
+  counters for content bytes read, entries visited, and subprocess calls and
+  stdout bytes; unmeasurable values are null with a note, never zero.
+- `byte_census.errors`: typed errors mapped to exit codes 1 (internal),
+  2 (usage), 3 (validation), and 4 (source unavailable). Every byte-census
+  error, including Click usage errors, is one JSON object on stderr with an
+  empty stdout and no traceback.
+- `--format json|table` scaffold for checks (`byte_census.command`). JSON is
+  the default; the table view uses no ANSI codes when stdout is not a TTY or
+  `NO_COLOR` is set.
+- Hidden internal command `byte-census _selftest`, not shown in `--help` and
+  not part of the public contract, which exercises the scaffold end to end.
+- Snapshot helper normalizes `meta.scope.roots[].st_dev` and path-derived IDs
+  in `id`, `finding_id`, `finding_ids`, and `suggestion_ids`.
+- `byte-census` entry point, an empty command group. `byte-census --version`
+  prints `byte-census 2.0.0`; bare invocation shows help and exits 0.
+- Dev dependency group with pytest, pytest-cov, and ruff.
+
+### Changed
+
+- `artifacts scan` discovery lists directories through the shared safe lister.
+- `dupfind` enumerates directories through the safe reader: it no longer
+  descends into other volumes or dataless (evicted) directories, which are
+  reported as warnings on stderr (exit 0). Output for ordinary trees is unchanged.
+- The contract now states the two `duplicates scan` ordering rules separately: an inode's primary name is its shallowest name, then code-point order; copies in a group, the kept copy, the removal command, and the reclaimable estimate follow code-point order of primary names. Output is unchanged.
+- `dupfind --output FILE` now creates the file exclusively. An existing file or
+  a symlink (dangling or not) at the path exits 3, writes nothing, and names the
+  path on stderr; there is no `--force`. A missing parent directory still exits 1.
+- `dupfind` prints a deprecation notice on stderr (also with `--quiet`); stdout is
+  unchanged. The adapter will be removed in 3.0.0.
+- The `byte-census` group reports usage errors as JSON on stderr instead of
+  Click's plain-text usage message; the exit code stays 2.
+- A missing option value and an interruption (Ctrl-C) now name the subcommand
+  in the error's `help`, and stderr holds exactly one JSON object. Every runner
+  failure other than a rejected argv (including an untrusted executable path
+  and oversized output) exits 4.
+- `meta.cost.elapsed_s` is defined as the time from the start of the command
+  callback until the envelope is complete, just before serialization.
+- Snapshots keep field order and the cost counters; only `elapsed_s`,
+  `captured_at`, integer `st_dev`, and finding IDs are masked, and every
+  finding ID is checked against the ID rule before masking.
+- The project is now `byte-census` 2.0.0. The package moved from
+  `duplicate_finder_cli` to a src layout at `src/byte_census/`.
+- The v1 duplicate finder code now lives in `byte_census.legacy`, split into
+  small modules. `report_writer.py` is the only module that writes files.
+- The `dupfind` help text now uses an `Example:` block (previously `Examples:`)
+  and accepts `-h` as well as `--help`. All other `dupfind` behavior is unchanged.
+
+### Fixed
+
+- `disk map` keeps the npm location uncertainty when another tool shares
+  the same cache location.
+- `dupfind` hashes each file beneath its resolved scan root, opening every path
+  component without following symlinks and checking the file against the lstat
+  recorded during collection. A parent directory swapped for a symlink during a
+  scan becomes a per-file warning (exit 0) instead of redirecting the read.
+  Output for ordinary trees is unchanged. With `--compare`, each side uses its
+  own root.
+- `duplicates scan` reopens each file beneath its own scan root, one directory at a time without following symlinks, and checks it against the file the walk recorded; a file whose parent was swapped for a symlink is never read and is listed as `changed_during_scan`.
+- `caches scan` and `duplicates scan --no-recursive` list a root through one shared
+  helper (`fsread.list_directory`): a dataless root is never listed (partial,
+  exit 0) and a foreign-device child is a skipped mount.
+- `caches scan` keeps the tool name and catalog suggestion of a tool cache that
+  lies inside a cache folder, is the Caches root, or shares a location with
+  another tool; an unreadable `~/.npmrc` is reported in `incomplete_coverage`
+  and marks the npm location uncertain; the `hard_links_merged` caveat no longer
+  depends on measurement order; a tool cache that vanishes is a coverage gap;
+  a tool cache location of `/`, the data volume, or the home directory is refused.
+- `dupfind` hashes through the safe reader: dataless (evicted) files are not
+  downloaded, FIFOs and other special files do not hang the scan, and a file
+  swapped for a symlink is not followed. Each becomes a per-file warning on
+  stderr and the run still exits 0. Output for regular files is unchanged.
+- `dupfind --output` writes undecodable path bytes faithfully, and a failed write
+  removes the file it created (only if it is still the same inode) and exits 1
+  with "Cannot write output file" instead of a traceback.
+
+### Security
+
+- Artifact sizing fails closed: `artifacts.py` passes the scan root and the
+  discovery `lstat` to `measure_subtree`, which always walks beneath the
+  root and has no path-string fallback; an artifact that lost its discovery
+  anchor is refused. `fsread.AnchoredPath` keeps its anchor through copy,
+  deepcopy, and pickle.
+- Caches scan reaches each folder listed in the Caches root beneath that
+  root, verified against the listing `lstat`, so a Caches root swapped for a
+  symlink after listing counts nothing outside it (`changed_during_scan`).
+- Every directory opened by the walker, `list_directory`, or an openat chain
+  is rechecked for `SF_DATALESS` on its descriptor; a dataless directory is
+  never listed and no child is looked up in it.
+- An `fstat` failure inside the openat chain no longer leaks the descriptor.
+- Fix: after a changed ancestor ends a deep branch whose descriptors were
+  evicted, the walker no longer looks up the name it had already taken from
+  the dropped directory in a surviving ancestor, which could report a path
+  that was never listed there or visit a sibling twice.
+- `fsread.walk` accepts `prune`, and the new `fsread.walk_beneath` reaches a
+  directory below a scan root through an `O_NOFOLLOW` openat chain, checks
+  its identity, and walks it on the scan root's device. Disk map's pruned
+  walk and artifacts discovery now use the pruning descriptor walk instead of
+  re-listing each directory by its path string, and artifact sizing walks
+  each artifact beneath its scan root, verified against the discovery
+  `lstat`. A directory swapped for a symlink after discovery is reported as
+  `changed_during_scan` and contributes no bytes.
+- A failing `fstat` after opening a file beneath a root no longer leaks the
+  descriptor.
+- `fsread.walk` and `fsread.list_directory` open every directory with
+  `O_RDONLY | O_DIRECTORY | O_NOFOLLOW` relative to its parent's
+  descriptor, confirm its identity with `fstat`, list it with `scandir` on
+  the descriptor, and examine children with `fstatat`. A directory or parent
+  swapped for a symlink during a scan is reported as `changed_during_scan`
+  instead of redirecting the walk outside the root. At most 16 directory
+  descriptors stay open; deeper ancestors are reopened by an `O_NOFOLLOW`
+  chain from the root. Entries on another device, including regular files,
+  are skipped mounts and never counted.
+- New `fsread.open_regular_file_beneath` and `fsread.hash_file_beneath` open
+  a file through an `O_NOFOLLOW` chain from its scan root, with an optional
+  identity check against the walk's `lstat`.
+- The runner pins `df`, `diskutil`, and `tmutil` to absolute system paths,
+  rejects relative `PATH` lookups for docker, uv, and brew, runs every
+  child with `cwd="/"` in its own session, kills the whole process group on
+  timeout, and caps captured output.
+- Children get a minimal explicit environment; Homebrew auto-update,
+  analytics, and hints are switched off.
+- npm is no longer run at all, because every npm invocation writes or deletes
+  debug logs. `byte_census.toolpaths.npm_cache_location` reads the npm cache
+  location from `npm_config_cache`, `~/.npmrc`, or the `~/.npm` default.
+- The walker no longer lists dataless directories (recorded as `dataless`)
+  and is iterative. `validate_root` resolves the path before checking it.
+- The AST guard now allowlists importable modules and every attribute of
+  each module, rejects chains that pass through one module to reach another,
+  rejects argument unpacking in file openers, and catches aliasing, dynamic
+  attribute access, re-exports, and write methods in any position.
+- The AST guard treats every module object, including byte_census modules,
+  as usable only inside an attribute chain, and forbids frame, traceback,
+  and code attributes (`gi_frame`, `f_globals`, `__traceback__`, and others)
+  in any position. Its threat model is documented in the guard and in
+  `docs/contracts/quantities.md`.
+- An npm `cache=` value must be absolute after expanding `~`, `$HOME`, or
+  `${HOME}`; otherwise it is reported in `note` and the next source is used.
+- The AST guard allows content reads (`open`, `Path.open`,
+  `Path.read_bytes`, `Path.read_text`, `os.open`) only in `fsread.py` and
+  `legacy/report_writer.py`, and directory enumeration that bypasses the
+  fsread walker (`os.scandir`, `os.listdir`, `os.walk`, `Path.iterdir`,
+  `Path.glob`, `Path.rglob`, `Path.walk`) only in `fsread.py`.
+
+### Documentation
+
+- `SKILL.md` now defines suggestion risk levels, the classification fields, caveats, and the reclaim estimate, explains duplicate group sums and the arbitrary kept copy, states that artifact suggestions also regenerate, lists the main options per command, and makes the classify-then-ask rule self-contained.
+- Added a root `SKILL.md` for agents, rewrote the README for byte-census 2.0.0 with help blocks checked against the live `--help` output, rewrote the agent extension in `gemini-extensions/` for byte-census and tracked its manifest, marked `SPECIFICATION.md` as the frozen v1 `dupfind` specification, and stated in `disk --help` that `disk map` is the one command without the `scan` verb.

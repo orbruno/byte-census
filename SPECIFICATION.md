@@ -1,10 +1,13 @@
 # Duplicate Finder CLI - Specification
 
+> Note: this document specifies the frozen v1 `dupfind` behavior. The byte-census 2.0.0 contracts live in [docs/contracts/](docs/contracts/README.md).
+
 ---
 **Version**: 1.0.0
 **Created**: 2025-12-20
 **Author**: Orlando Bruno
-**Status**: Implementation Ready
+**Status**: Implemented
+**Last Core Verification**: 2026-08-28
 
 ---
 
@@ -70,18 +73,19 @@ Users accumulate duplicate files across their filesystem, wasting storage space 
 For Single Directory Mode:
 1. Collect all file paths (recursive or non-recursive)
 2. Filter by minimum size threshold
-3. For each file:
+3. Group files by size and discard groups that cannot contain duplicates
+4. For each remaining candidate:
    a. Read file in 8KB chunks
    b. Calculate SHA256 hash incrementally
    c. Store hash -> [file_paths] mapping
-4. Return only hashes with >1 file path (duplicates)
-5. Calculate statistics (total duplicates, wasted bytes)
+5. Return only hashes with >1 file path (duplicates)
+6. Calculate statistics (files scanned, total duplicates, wasted bytes)
 
 For Compare Mode:
-1. Hash all files in directory A
-2. Hash all files in directory B
-3. Find intersection of hash sets
-4. Return files from both directories sharing same hash
+1. Group files from both directories by size
+2. Hash only size groups present in both directories
+3. Find the intersection of hash sets
+4. Return files from both directories sharing the same hash
 ```
 
 ### Data Structures
@@ -146,6 +150,7 @@ duplicate-finder-cli/
 ├── pyproject.toml            # Package configuration
 ├── .gitignore                # Git exclusions
 ├── uv.lock                   # Dependency lockfile
+├── test_duplicate_finder_cli.py # Regression suite
 └── duplicate_finder_cli/
     ├── __init__.py           # Package marker
     └── main.py               # CLI implementation
@@ -257,6 +262,9 @@ a3f5b8c...,3,16140288,/Users/orlando/Desktop/report-copy.pdf
 - Exclude patterns (`--exclude "*.tmp"`)
 - Follow symlinks option (`--follow-symlinks`)
 - Dry-run mode for deletion operations
+
+These enhancements are advisory and are not part of the verified version 1.0.0
+scope.
 
 ## References
 

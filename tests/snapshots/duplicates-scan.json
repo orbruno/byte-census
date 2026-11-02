@@ -1,0 +1,157 @@
+{
+  "data": {
+    "summary": {
+      "files_considered": 7,
+      "size_candidates": 6,
+      "partial_hash_candidates": 5,
+      "duplicate_groups": 2,
+      "duplicate_copies": 4,
+      "reclaimable_estimate_bytes": 106496
+    },
+    "findings": [
+      {
+        "id": "dup-<ID1>",
+        "kind": "duplicate_group",
+        "target": "sha256:1d3f568c4cd085c1a1d9667e63c2a0e0b07a5a8a750f5e306bc1e96957ce10fc",
+        "logical_bytes": 204800,
+        "allocated_bytes": 204800,
+        "reclaimable_estimate_bytes": 102400,
+        "caveats": [
+          "apfs_clone_or_shared_extent",
+          "hard_links_merged"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "duplicate-remove-extra-copies@dup-<ID1>"
+        ],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "content_sha256": "1d3f568c4cd085c1a1d9667e63c2a0e0b07a5a8a750f5e306bc1e96957ce10fc",
+          "partial_sha256": "156c38442089c1323d3e3ba549a6ac24341c47e8b6367bec4740c9b8c865826e",
+          "file_logical_bytes": 102400,
+          "copy_count": 2,
+          "files": [
+            {
+              "path": "<ROOT>/a.bin",
+              "allocated_bytes": 102400,
+              "hard_link_paths": [
+                "<ROOT>/sub/a-link.bin"
+              ]
+            },
+            {
+              "path": "<ROOT>/b.bin",
+              "allocated_bytes": 102400,
+              "hard_link_paths": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "dup-<ID2>",
+        "kind": "duplicate_group",
+        "target": "sha256:d1240bd4639d549b687e2357c63b1f32c2588a80776d17f2b21bb9d45b3fbb39",
+        "logical_bytes": 20,
+        "allocated_bytes": 8192,
+        "reclaimable_estimate_bytes": 4096,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "duplicate-remove-extra-copies@dup-<ID2>"
+        ],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "content_sha256": "d1240bd4639d549b687e2357c63b1f32c2588a80776d17f2b21bb9d45b3fbb39",
+          "partial_sha256": "d1240bd4639d549b687e2357c63b1f32c2588a80776d17f2b21bb9d45b3fbb39",
+          "file_logical_bytes": 10,
+          "copy_count": 2,
+          "files": [
+            {
+              "path": "<ROOT>/s1.txt",
+              "allocated_bytes": 4096,
+              "hard_link_paths": []
+            },
+            {
+              "path": "<ROOT>/sub/s2.txt",
+              "allocated_bytes": 4096,
+              "hard_link_paths": []
+            }
+          ]
+        }
+      }
+    ],
+    "suggestions": [
+      {
+        "id": "duplicate-remove-extra-copies@dup-<ID2>",
+        "command": "rm -- '<ROOT>/sub/s2.txt'",
+        "risk": "high",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Identical content. The command keeps '<ROOT>/s1.txt' only because it sorts first; the owner chooses which copy to keep. Every name of a removed copy is listed, because removing one hard-link name frees nothing.",
+        "finding_ids": [
+          "dup-<ID2>"
+        ]
+      },
+      {
+        "id": "duplicate-remove-extra-copies@dup-<ID1>",
+        "command": "rm -- '<ROOT>/b.bin'",
+        "risk": "high",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Identical content. The command keeps '<ROOT>/a.bin' only because it sorts first; the owner chooses which copy to keep. Every name of a removed copy is listed, because removing one hard-link name frees nothing.",
+        "finding_ids": [
+          "dup-<ID1>"
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "duplicates scan",
+    "captured_at": "<CAPTURED_AT>",
+    "status": "complete",
+    "scope": {
+      "roots": [
+        {
+          "path": "<ROOT>",
+          "given": "<ROOT>",
+          "st_dev": "<ST_DEV>"
+        }
+      ],
+      "options": {
+        "compare": null,
+        "min_size": 0,
+        "recursive": true
+      },
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": "<ELAPSED_S>",
+      "content_bytes_read": 569364,
+      "entries_visited": 11,
+      "subprocess_calls": 0,
+      "subprocess_stdout_bytes": 0,
+      "subprocess_content_bytes_read": 0,
+      "notes": {}
+    },
+    "incomplete_coverage": [],
+    "unavailable_sources": []
+  }
+}

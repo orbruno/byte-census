@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0.0",
+  "error": "docker scan could not read Docker disk usage",
+  "reason": "`docker system df` exited with status 1: Cannot connect to the Docker daemon. Is the docker daemon running?",
+  "suggestion": "Start Docker Desktop or the Docker daemon, then run `byte-census docker scan` again.",
+  "help": "byte-census docker scan --help",
+  "code": "source_unavailable",
+  "exit_code": 4
+}

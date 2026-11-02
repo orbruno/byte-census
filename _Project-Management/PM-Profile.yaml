@@ -1,0 +1,28 @@
+profile_schema: scrum-pm-profile
+schema_version: 1.0.0
+project_id: duplicate-finder-cli
+locale: en
+views:
+  dashboard_sections:
+  - summary
+  - product_goal
+  - priority_progress
+  - active_work
+  - epics
+  - evaluations
+  - learnings
+  - estimate_coverage
+  include_history: false
+  include_excluded_scope: true
+  link_style: relative
+  labels: {}
+evaluations:
+- definition_id: pm-conformance
+  definition_version: 1.0.0
+  trigger: pm-validate
+  transition: pm:validated
+  enforcement: advisory
+  threshold_overrides: {}
+compatibility:
+  read_legacy: false
+  report_ambiguity: true

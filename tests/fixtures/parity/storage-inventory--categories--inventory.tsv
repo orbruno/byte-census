@@ -1,0 +1,28 @@
+section	target	kb	note
+baseline	/System/Volumes/Data	<DF_USED_KB>	df used (data volume)
+scan-root	<FIXTURE>/scan	9032	errors=0 nested=0
+first-level	<FIXTURE>/scan/media	4608	under <FIXTURE>/scan
+first-level	<FIXTURE>/scan/archive	3072	under <FIXTURE>/scan
+first-level	<FIXTURE>/scan/projects	88	under <FIXTURE>/scan
+first-level	<FIXTURE>/scan/docs	40	under <FIXTURE>/scan
+first-level	<FIXTURE>/scan/empty	0	under <FIXTURE>/scan
+large-file	<FIXTURE>/scan/media/movie.mov	3072	under <FIXTURE>/scan
+large-file	<FIXTURE>/scan/archive/old.zip	2048	under <FIXTURE>/scan
+large-file	<FIXTURE>/scan/media/clips/a.mp4	1536	under <FIXTURE>/scan
+large-file	<FIXTURE>/scan/root.bin	1224	under <FIXTURE>/scan
+scan-root	<FIXTURE>/home/Library/Application Support	1400	errors=0 nested=0
+first-level	<FIXTURE>/home/Library/Application Support/Steam	900	under <FIXTURE>/home/Library/Application Support
+first-level	<FIXTURE>/home/Library/Application Support/MobileSync	500	under <FIXTURE>/home/Library/Application Support
+category	<FIXTURE>/home/Library/Caches	300	User caches errors=0 counted=1
+category	<FIXTURE>/home/Library/Application Support	1400	Application support errors=0 counted=0
+category	<FIXTURE>/home/Library/Containers	260	App containers errors=0 counted=1
+category	<FIXTURE>/home/Library/Group Containers	120	Group containers errors=0 counted=1
+category	<FIXTURE>/home/Library/Developer	700	Developer data errors=0 counted=1
+category	<FIXTURE>/home/Library/Application Support/MobileSync/Backup	500	Device backups (inside Application support) errors=0 counted=0
+category	<FIXTURE>/home/Library/Mail	60	Mail errors=0 counted=1
+category	<FIXTURE>/home/Library/Messages	92	Messages errors=0 counted=1
+category	<FIXTURE>/home/Downloads	452	Downloads errors=0 counted=1
+category	/Applications	<MACHINE_KB>	Applications errors=<MACHINE> counted=1
+snapshots	/	0	count=<SNAPSHOT_COUNT>
+reconciliation	measured	<MACHINE_KB>	
+reconciliation	unexplained	<MACHINE_KB>	

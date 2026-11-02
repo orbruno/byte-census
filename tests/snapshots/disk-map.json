@@ -1,0 +1,292 @@
+{
+  "data": {
+    "summary": {
+      "root_count": 2,
+      "finding_count": 7,
+      "measured_allocated_bytes": 2199552
+    },
+    "findings": [
+      {
+        "id": "map-<ID1>",
+        "kind": "root_total",
+        "target": "<ROOT>/Users/example/Documents",
+        "logical_bytes": 1987864,
+        "allocated_bytes": 1998848,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "given": "<ROOT>/Users/example/Documents",
+          "counted_allocated_bytes": 1998848,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID2>",
+        "kind": "root_total",
+        "target": "<ROOT>/Users/example/Music",
+        "logical_bytes": 200000,
+        "allocated_bytes": 200704,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "given": "<ROOT>/Users/example/Music",
+          "counted_allocated_bytes": 200704,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID3>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Documents/large",
+        "logical_bytes": 1572864,
+        "allocated_bytes": 1572864,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Documents"
+        }
+      },
+      {
+        "id": "map-<ID4>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Documents/big",
+        "logical_bytes": 400000,
+        "allocated_bytes": 405504,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Documents"
+        }
+      },
+      {
+        "id": "map-<ID5>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Music/album",
+        "logical_bytes": 200000,
+        "allocated_bytes": 200704,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Music"
+        }
+      },
+      {
+        "id": "map-<ID6>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Documents/small",
+        "logical_bytes": 10000,
+        "allocated_bytes": 12288,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Documents"
+        }
+      },
+      {
+        "id": "map-<ID7>",
+        "kind": "large_file",
+        "target": "<ROOT>/Users/example/Documents/large/movie.mov",
+        "logical_bytes": 1572864,
+        "allocated_bytes": 1572864,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Documents"
+        }
+      }
+    ],
+    "reconciliation": {
+      "df_command": "df -k /System/Volumes/Data",
+      "df_used_bytes": 5120000,
+      "measured_allocated_bytes": 2199552,
+      "delta_bytes": 2920448,
+      "overcount": false,
+      "contributions": [
+        {
+          "finding_id": "map-<ID1>",
+          "counted_allocated_bytes": 1998848
+        },
+        {
+          "finding_id": "map-<ID2>",
+          "counted_allocated_bytes": 200704
+        }
+      ],
+      "note": "Measured is the sum of unique counted contributions in precedence order. Signed delta: df used minus measured; negative means overcount and is never clamped."
+    },
+    "system": {
+      "df_data_volume": {
+        "mount": "/System/Volumes/Data",
+        "total_bytes": 994662584320,
+        "used_bytes": 5120000,
+        "available_bytes": 994657464320
+      },
+      "df_system_volume": {
+        "mount": "/",
+        "used_bytes": 12264947712
+      },
+      "diskutil": {
+        "volume_name": "Macintosh HD",
+        "file_system_personality": "APFS",
+        "container_total_space": "994.7 GB (994662584320 Bytes)",
+        "container_free_space": "350.1 GB (350108332032 Bytes)"
+      },
+      "local_snapshot_count": 2,
+      "docker_informational": {
+        "available": false,
+        "docker_reported_size_bytes": null,
+        "summed_into_host_totals": false,
+        "see_check": "docker scan"
+      }
+    },
+    "tree": {
+      "depth": 4,
+      "min_bytes": 104857600,
+      "roots": [
+        {
+          "path": "<ROOT>/Users/example/Documents",
+          "allocated_bytes": 1998848,
+          "children": []
+        },
+        {
+          "path": "<ROOT>/Users/example/Music",
+          "allocated_bytes": 200704,
+          "children": []
+        }
+      ]
+    },
+    "suggestions": []
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "disk map",
+    "captured_at": "<CAPTURED_AT>",
+    "status": "complete",
+    "scope": {
+      "roots": [
+        {
+          "path": "<ROOT>/Users/example/Documents",
+          "given": "<ROOT>/Users/example/Documents",
+          "st_dev": "<ST_DEV>"
+        },
+        {
+          "path": "<ROOT>/Users/example/Music",
+          "given": "<ROOT>/Users/example/Music",
+          "st_dev": "<ST_DEV>"
+        }
+      ],
+      "options": {
+        "top": 30,
+        "large_file_min_mb": 1,
+        "skip_categories": false,
+        "tree_depth": 4,
+        "tree_min_mb": 100
+      },
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": "<ELAPSED_S>",
+      "content_bytes_read": 0,
+      "entries_visited": 13,
+      "subprocess_calls": 7,
+      "subprocess_stdout_bytes": 653,
+      "subprocess_content_bytes_read": null,
+      "notes": {
+        "subprocess_content_bytes_read": "Reads performed inside external commands cannot be measured from this process."
+      }
+    },
+    "incomplete_coverage": [],
+    "unavailable_sources": [
+      {
+        "source": "brew",
+        "reason": "not_installed",
+        "detail": "brew was not found on PATH; its cache was not measured."
+      },
+      {
+        "source": "docker",
+        "reason": "not_installed",
+        "detail": "docker is not installed"
+      },
+      {
+        "source": "npm",
+        "reason": "not_installed",
+        "detail": "<ROOT>/Users/example/.npm does not exist (npm cache location from default); nothing was measured."
+      },
+      {
+        "source": "uv",
+        "reason": "not_installed",
+        "detail": "uv was not found on PATH; its cache was not measured."
+      }
+    ]
+  }
+}

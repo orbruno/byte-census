@@ -1,0 +1,209 @@
+{
+  "data": {
+    "summary": {
+      "cache_dir_count": 4,
+      "tool_cache_count": 1,
+      "total_allocated_bytes": 770048,
+      "top": 20,
+      "shown": 5,
+      "truncated": false
+    },
+    "findings": [
+      {
+        "id": "cch-<ID1>",
+        "kind": "cache_dir",
+        "target": "<ROOT>/Library/Caches/big",
+        "logical_bytes": 300000,
+        "allocated_bytes": 303104,
+        "reclaimable_estimate_bytes": 303104,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": null,
+          "location_source": "child of ~/Library/Caches"
+        }
+      },
+      {
+        "id": "cch-<ID2>",
+        "kind": "cache_dir",
+        "target": "<ROOT>/Library/Caches/Homebrew",
+        "logical_bytes": 200000,
+        "allocated_bytes": 200704,
+        "reclaimable_estimate_bytes": 200704,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "brew-cleanup"
+        ],
+        "classification": {
+          "owner": "brew",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": "brew",
+          "location_source": "brew --cache"
+        }
+      },
+      {
+        "id": "cch-<ID3>",
+        "kind": "tool_cache",
+        "target": "<ROOT>/.cache/uv",
+        "logical_bytes": 150000,
+        "allocated_bytes": 151552,
+        "reclaimable_estimate_bytes": 151552,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [
+          "uv-cache-prune"
+        ],
+        "classification": {
+          "owner": "uv",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": "uv",
+          "location_source": "uv cache dir"
+        }
+      },
+      {
+        "id": "cch-<ID4>",
+        "kind": "cache_dir",
+        "target": "<ROOT>/Library/Caches/medium",
+        "logical_bytes": 100000,
+        "allocated_bytes": 102400,
+        "reclaimable_estimate_bytes": 102400,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": null,
+          "location_source": "child of ~/Library/Caches"
+        }
+      },
+      {
+        "id": "cch-<ID5>",
+        "kind": "cache_dir",
+        "target": "<ROOT>/Library/Caches/small",
+        "logical_bytes": 10000,
+        "allocated_bytes": 12288,
+        "reclaimable_estimate_bytes": 12288,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": null,
+          "location_source": "child of ~/Library/Caches"
+        }
+      }
+    ],
+    "suggestions": [
+      {
+        "id": "brew-cleanup",
+        "command": "brew cleanup",
+        "risk": "low",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Removes outdated downloads and old formula versions from the Homebrew cache.",
+        "finding_ids": [
+          "cch-<ID2>"
+        ]
+      },
+      {
+        "id": "uv-cache-prune",
+        "command": "uv cache prune",
+        "risk": "low",
+        "reversible": false,
+        "requires_owner_authorization": true,
+        "reason": "Removes unused entries from the uv cache; uv downloads them again when needed.",
+        "finding_ids": [
+          "cch-<ID3>"
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "caches scan",
+    "captured_at": "<CAPTURED_AT>",
+    "status": "complete",
+    "scope": {
+      "roots": [
+        {
+          "path": "<ROOT>/.cache/uv",
+          "given": "uv cache dir",
+          "st_dev": "<ST_DEV>"
+        },
+        {
+          "path": "<ROOT>/Library/Caches",
+          "given": "~/Library/Caches",
+          "st_dev": "<ST_DEV>"
+        }
+      ],
+      "options": {
+        "top": 20
+      },
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": "<ELAPSED_S>",
+      "content_bytes_read": 0,
+      "entries_visited": 12,
+      "subprocess_calls": 2,
+      "subprocess_stdout_bytes": 80,
+      "subprocess_content_bytes_read": null,
+      "notes": {
+        "subprocess_content_bytes_read": "Reads performed inside external commands cannot be measured from this process."
+      }
+    },
+    "incomplete_coverage": [],
+    "unavailable_sources": [
+      {
+        "source": "npm",
+        "reason": "not_installed",
+        "detail": "<ROOT>/.npm does not exist (npm cache location from default); nothing was measured."
+      }
+    ]
+  }
+}

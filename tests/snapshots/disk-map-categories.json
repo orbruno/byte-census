@@ -1,0 +1,712 @@
+{
+  "data": {
+    "summary": {
+      "root_count": 2,
+      "finding_count": 24,
+      "measured_allocated_bytes": 1294336
+    },
+    "findings": [
+      {
+        "id": "map-<ID1>",
+        "kind": "root_total",
+        "target": "<ROOT>/Users/example/Library/Application Support",
+        "logical_bytes": 550000,
+        "allocated_bytes": 557056,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "given": "<ROOT>/Users/example/Library/Application Support",
+          "counted_allocated_bytes": 557056,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID2>",
+        "kind": "root_total",
+        "target": "<ROOT>/Users/example/Library/Developer/Xcode",
+        "logical_bytes": 290000,
+        "allocated_bytes": 290816,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "apfs_clone_or_shared_extent"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "given": "<ROOT>/Users/example/Library/Developer/Xcode",
+          "counted_allocated_bytes": 290816,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID3>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Library/Application Support/Steam",
+        "logical_bytes": 400000,
+        "allocated_bytes": 401408,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Application Support"
+        }
+      },
+      {
+        "id": "map-<ID4>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Library/Developer/Xcode/DerivedData",
+        "logical_bytes": 200000,
+        "allocated_bytes": 200704,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Developer/Xcode"
+        }
+      },
+      {
+        "id": "map-<ID5>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Library/Application Support/MobileSync",
+        "logical_bytes": 120000,
+        "allocated_bytes": 122880,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Application Support"
+        }
+      },
+      {
+        "id": "map-<ID6>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Library/Developer/Xcode/iOS DeviceSupport",
+        "logical_bytes": 90000,
+        "allocated_bytes": 90112,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Developer/Xcode"
+        }
+      },
+      {
+        "id": "map-<ID7>",
+        "kind": "first_level",
+        "target": "<ROOT>/Users/example/Library/Application Support/Google",
+        "logical_bytes": 30000,
+        "allocated_bytes": 32768,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Application Support"
+        }
+      },
+      {
+        "id": "map-<ID8>",
+        "kind": "large_file",
+        "target": "<ROOT>/Users/example/Library/Application Support/Steam/game.pak",
+        "logical_bytes": 400000,
+        "allocated_bytes": 401408,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Application Support"
+        }
+      },
+      {
+        "id": "map-<ID9>",
+        "kind": "large_file",
+        "target": "<ROOT>/Users/example/Library/Developer/Xcode/DerivedData/build.o",
+        "logical_bytes": 200000,
+        "allocated_bytes": 200704,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Developer/Xcode"
+        }
+      },
+      {
+        "id": "map-<ID10>",
+        "kind": "large_file",
+        "target": "<ROOT>/Users/example/Library/Application Support/MobileSync/Backup/0000/Manifest.db",
+        "logical_bytes": 120000,
+        "allocated_bytes": 122880,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Application Support"
+        }
+      },
+      {
+        "id": "map-<ID11>",
+        "kind": "large_file",
+        "target": "<ROOT>/Users/example/Library/Developer/Xcode/iOS DeviceSupport/sym.bin",
+        "logical_bytes": 90000,
+        "allocated_bytes": 90112,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Developer/Xcode"
+        }
+      },
+      {
+        "id": "map-<ID12>",
+        "kind": "large_file",
+        "target": "<ROOT>/Users/example/Library/Application Support/Google/chrome.bin",
+        "logical_bytes": 30000,
+        "allocated_bytes": 32768,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "root": "<ROOT>/Users/example/Library/Application Support"
+        }
+      },
+      {
+        "id": "map-<ID13>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Library/Application Support",
+        "logical_bytes": 550000,
+        "allocated_bytes": 557056,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "inside_other_scope"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Application support",
+          "counted_allocated_bytes": 0,
+          "overlap": "equals_scan_root"
+        }
+      },
+      {
+        "id": "map-<ID14>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Library/Developer",
+        "logical_bytes": 360000,
+        "allocated_bytes": 364544,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Developer data",
+          "counted_allocated_bytes": 73728,
+          "overlap": "encloses_scan_root"
+        }
+      },
+      {
+        "id": "map-<ID15>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Library/Application Support/MobileSync/Backup",
+        "logical_bytes": 120000,
+        "allocated_bytes": 122880,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "inside_other_scope"
+        ],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Device backups (inside Application support)",
+          "counted_allocated_bytes": 0,
+          "overlap": "inside_scan_root"
+        }
+      },
+      {
+        "id": "map-<ID16>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Library/Caches",
+        "logical_bytes": 110000,
+        "allocated_bytes": 114688,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "caches scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "User caches",
+          "counted_allocated_bytes": 114688,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID17>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Library/Containers",
+        "logical_bytes": 80000,
+        "allocated_bytes": 81920,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "App containers",
+          "counted_allocated_bytes": 81920,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID18>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Library/Group Containers",
+        "logical_bytes": 40000,
+        "allocated_bytes": 40960,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Group containers",
+          "counted_allocated_bytes": 40960,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID19>",
+        "kind": "category",
+        "target": "<ROOT>/Applications",
+        "logical_bytes": 35000,
+        "allocated_bytes": 36864,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Applications",
+          "counted_allocated_bytes": 36864,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID20>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Downloads",
+        "logical_bytes": 25000,
+        "allocated_bytes": 28672,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "duplicates scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Downloads",
+          "counted_allocated_bytes": 28672,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID21>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Library/Mail",
+        "logical_bytes": 10000,
+        "allocated_bytes": 12288,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Mail",
+          "counted_allocated_bytes": 12288,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID22>",
+        "kind": "category",
+        "target": "<ROOT>/Users/example/Library/Messages",
+        "logical_bytes": 10000,
+        "allocated_bytes": 12288,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": null,
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "label": "Messages",
+          "counted_allocated_bytes": 12288,
+          "overlap": null
+        }
+      },
+      {
+        "id": "map-<ID23>",
+        "kind": "tool_cache",
+        "target": "<ROOT>/Users/example/Library/Caches/Homebrew",
+        "logical_bytes": 50000,
+        "allocated_bytes": 53248,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [
+          "inside_other_scope"
+        ],
+        "see_check": "caches scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "brew",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": "brew",
+          "counted_allocated_bytes": 0,
+          "overlap": "inside_category"
+        }
+      },
+      {
+        "id": "map-<ID24>",
+        "kind": "tool_cache",
+        "target": "<ROOT>/Users/example/.cache/uv",
+        "logical_bytes": 45000,
+        "allocated_bytes": 45056,
+        "reclaimable_estimate_bytes": null,
+        "caveats": [],
+        "see_check": "caches scan",
+        "suggestion_ids": [],
+        "classification": {
+          "owner": "uv",
+          "status": "unknown",
+          "recovery": "unknown",
+          "confidence": "low",
+          "disposition": "investigate"
+        },
+        "details": {
+          "tool": "uv",
+          "counted_allocated_bytes": 45056,
+          "overlap": null
+        }
+      }
+    ],
+    "reconciliation": {
+      "df_command": "df -k /System/Volumes/Data",
+      "df_used_bytes": 1024000000,
+      "measured_allocated_bytes": 1294336,
+      "delta_bytes": 1022705664,
+      "overcount": false,
+      "contributions": [
+        {
+          "finding_id": "map-<ID1>",
+          "counted_allocated_bytes": 557056
+        },
+        {
+          "finding_id": "map-<ID2>",
+          "counted_allocated_bytes": 290816
+        },
+        {
+          "finding_id": "map-<ID16>",
+          "counted_allocated_bytes": 114688
+        },
+        {
+          "finding_id": "map-<ID13>",
+          "counted_allocated_bytes": 0
+        },
+        {
+          "finding_id": "map-<ID17>",
+          "counted_allocated_bytes": 81920
+        },
+        {
+          "finding_id": "map-<ID18>",
+          "counted_allocated_bytes": 40960
+        },
+        {
+          "finding_id": "map-<ID14>",
+          "counted_allocated_bytes": 73728
+        },
+        {
+          "finding_id": "map-<ID15>",
+          "counted_allocated_bytes": 0
+        },
+        {
+          "finding_id": "map-<ID21>",
+          "counted_allocated_bytes": 12288
+        },
+        {
+          "finding_id": "map-<ID22>",
+          "counted_allocated_bytes": 12288
+        },
+        {
+          "finding_id": "map-<ID20>",
+          "counted_allocated_bytes": 28672
+        },
+        {
+          "finding_id": "map-<ID19>",
+          "counted_allocated_bytes": 36864
+        },
+        {
+          "finding_id": "map-<ID24>",
+          "counted_allocated_bytes": 45056
+        },
+        {
+          "finding_id": "map-<ID23>",
+          "counted_allocated_bytes": 0
+        }
+      ],
+      "note": "Measured is the sum of unique counted contributions in precedence order. Signed delta: df used minus measured; negative means overcount and is never clamped."
+    },
+    "system": {
+      "df_data_volume": {
+        "mount": "/System/Volumes/Data",
+        "total_bytes": 994662584320,
+        "used_bytes": 1024000000,
+        "available_bytes": 993638584320
+      },
+      "df_system_volume": {
+        "mount": "/",
+        "used_bytes": 12264947712
+      },
+      "diskutil": {
+        "volume_name": "Macintosh HD",
+        "file_system_personality": "APFS",
+        "container_total_space": "994.7 GB (994662584320 Bytes)",
+        "container_free_space": "350.1 GB (350108332032 Bytes)"
+      },
+      "local_snapshot_count": 2,
+      "docker_informational": {
+        "available": true,
+        "docker_reported_size_bytes": 11784600000,
+        "summed_into_host_totals": false,
+        "see_check": "docker scan"
+      }
+    },
+    "tree": {
+      "depth": 4,
+      "min_bytes": 104857600,
+      "roots": [
+        {
+          "path": "<ROOT>/Users/example/Library/Application Support",
+          "allocated_bytes": 557056,
+          "children": []
+        },
+        {
+          "path": "<ROOT>/Users/example/Library/Developer/Xcode",
+          "allocated_bytes": 290816,
+          "children": []
+        }
+      ]
+    },
+    "suggestions": []
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "tool": {
+      "name": "byte-census",
+      "version": "2.0.0"
+    },
+    "command": "disk map",
+    "captured_at": "<CAPTURED_AT>",
+    "status": "complete",
+    "scope": {
+      "roots": [
+        {
+          "path": "<ROOT>/Users/example/Library/Application Support",
+          "given": "<ROOT>/Users/example/Library/Application Support",
+          "st_dev": "<ST_DEV>"
+        },
+        {
+          "path": "<ROOT>/Users/example/Library/Developer/Xcode",
+          "given": "<ROOT>/Users/example/Library/Developer/Xcode",
+          "st_dev": "<ST_DEV>"
+        }
+      ],
+      "options": {
+        "top": 30,
+        "large_file_min_mb": 0,
+        "skip_categories": false,
+        "tree_depth": 4,
+        "tree_min_mb": 100
+      },
+      "skipped_mounts": []
+    },
+    "cost": {
+      "elapsed_s": "<ELAPSED_S>",
+      "content_bytes_read": 0,
+      "entries_visited": 41,
+      "subprocess_calls": 7,
+      "subprocess_stdout_bytes": "<VOLATILE>",
+      "subprocess_content_bytes_read": null,
+      "notes": {
+        "subprocess_content_bytes_read": "Reads performed inside external commands cannot be measured from this process."
+      }
+    },
+    "incomplete_coverage": [],
+    "unavailable_sources": [
+      {
+        "source": "npm",
+        "reason": "not_installed",
+        "detail": "<ROOT>/Users/example/.npm does not exist (npm cache location from default); nothing was measured."
+      }
+    ]
+  }
+}

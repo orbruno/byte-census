@@ -53,3 +53,11 @@ htmlcov/
 *.json
 *.csv
 test_files/
+
+# Local agent worktrees
+.claude/worktrees/
+
+# Tracked JSON: contract examples and test snapshots
+!docs/contracts/examples/*.json
+!tests/snapshots/*.json
+!gemini-extensions/*/gemini-extension.json
