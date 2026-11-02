@@ -8,7 +8,7 @@ profile: compact
 title: "Define the observation contracts, parity matrix, and ADR-002 adaptations"
 parent: null
 points: 5
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"

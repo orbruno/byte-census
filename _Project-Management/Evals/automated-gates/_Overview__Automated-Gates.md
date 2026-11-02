@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: automated-gates
-source_fingerprint: sha256:fd030123491900f9ad3b9b8f400f93b7c4bef5b4a0987c673e5e53749ba84efe
+source_fingerprint: sha256:f4ea1905c58a50b2f30a1f4db306a1100e54815029657916076eeb6b2b7a3db4
 ---
 
 # Automated Gates

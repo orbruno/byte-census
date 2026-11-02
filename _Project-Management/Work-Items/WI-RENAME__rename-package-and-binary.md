@@ -8,7 +8,7 @@ profile: compact
 title: "Move to a src layout with byte-census and dupfind entry points"
 parent: null
 points: 3
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -47,7 +47,11 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commit 6ed35a6 on feat/byte-census: src layout, `byte-census` group, `dupfind` under `byte_census.legacy`, `legacy/report_writer.py` as the only writer, dev group, CHANGELOG 2.0.0.
+- 2026-11-02 test run: `uv run pytest -q` 15 passed (9 legacy, 6 new; new tests failed first); `ruff check` and `ruff format --check` clean.
+- 2026-11-02 parity check: v1 and new `dupfind` produce byte-identical stdout and stderr for json, csv and table on a fixture with nested, small and 200 KB duplicates; exit codes match for argument misuse (2).
+- Independent review: pending.
+- Closure: held open until the first CI run with the coverage gate and guard is green.
 
 ---
 Last Updated: 2026-11-02
