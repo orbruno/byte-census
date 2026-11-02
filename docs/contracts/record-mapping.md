@@ -47,7 +47,7 @@ Findings without any byte measure are not mapped. Mapped Docker findings keep th
 | `operation.date` | Date part of `meta.captured_at`. |
 | `operation.scope.roots` | `meta.scope.roots[].path` (at least one; `docker scan` alone cannot populate a record). |
 | `operation.scope.exclusions` | `meta.scope.skipped_mounts`. |
-| `operation.scope.incomplete` | `meta.incomplete_coverage[].path`, plus `unavailable_sources[].source` with reason `failed` or `timed_out`. |
+| `operation.scope.incomplete` | `meta.incomplete_coverage[].path`, plus `source:<name>` for each `unavailable_sources[]` entry with reason `failed` or `timed_out` (see below). |
 | `operation.purpose`, `platform`, `operator`, `device` | Not produced by byte-census; supplied by the operator. |
 | `baseline[]` | From disk map `data.system`, one item per source that returned a value, in this order: `df -k /System/Volumes/Data`, `df -k /`, `diskutil info /`, `tmutil listlocalsnapshots /`. `measured_at` = `meta.captured_at`, `command` = the argv joined by spaces, `observation` = a one-line summary in bytes. |
 | `decision_queue` | `[]`. |
