@@ -8,7 +8,7 @@ profile: compact
 title: "Provide snapshot, coverage, and CI infrastructure"
 parent: null
 points: 2
-status: proposed
+status: in_progress
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
@@ -45,7 +45,9 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- Commit 82de701: `tests/support/snapshots.py` with ten helper tests written first, pytest-cov gate at 80 percent, `.github/workflows/ci.yml` on macos-latest with actions/checkout@v7 and astral-sh/setup-uv@v7 (current majors checked against the published tags on 2026-11-02).
+- Local run 2026-11-02: 25 passed, coverage 85.33 percent, ruff clean.
+- CI run on the feature branch: pending push authorization.
 
 ---
 Last Updated: 2026-11-02

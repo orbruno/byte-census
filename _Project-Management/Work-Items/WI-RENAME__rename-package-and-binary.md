@@ -50,7 +50,8 @@ Evidence:
 - Commit 6ed35a6 on feat/byte-census: src layout, `byte-census` group, `dupfind` under `byte_census.legacy`, `legacy/report_writer.py` as the only writer, dev group, CHANGELOG 2.0.0.
 - 2026-11-02 test run: `uv run pytest -q` 15 passed (9 legacy, 6 new; new tests failed first); `ruff check` and `ruff format --check` clean.
 - 2026-11-02 parity check: v1 and new `dupfind` produce byte-identical stdout and stderr for json, csv and table on a fixture with nested, small and 200 KB duplicates; exit codes match for argument misuse (2).
-- Independent review: pending.
+- Independent review: first review of 6ed35a6 BLOCKED (three functions over 50 lines; usage hint changed to `-h`); fixed in 3aa5f7c with a regression test; fresh re-review READY on 2026-11-02 (26 tests, coverage 85.90 percent, longest function 48 lines).
+- Error-path parity after the fix: unknown option, invalid value, invalid choice and missing compare path produce output and exit codes identical to v1 with the locked click 8.3.1; only `--help` layout differs, by design.
 - Closure: held open until the first CI run with the coverage gate and guard is green.
 
 ---

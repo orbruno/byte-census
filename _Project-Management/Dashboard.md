@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: dashboard
-source_fingerprint: sha256:f4ea1905c58a50b2f30a1f4db306a1100e54815029657916076eeb6b2b7a3db4
+source_fingerprint: sha256:6205119e57664949c37f63436c8d11f6fbc5692741e8bfd65f973f22a288ad0b
 ---
 
 # Project Management Dashboard - duplicate-finder-cli
@@ -45,7 +45,7 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 | [WI-ADR-PYTHON](Work-Items/WI-ADR-PYTHON__python-implementation-decision.md) | decision | - | Record Python as the implementation language for byte-census | A | 1 | 1 | in_progress |
 | [WI-CONTRACTS](Work-Items/WI-CONTRACTS__observation-contracts-and-parity.md) | decision | - | Define the observation contracts, parity matrix, and ADR-002 adaptations | A | 2 | 5 | in_progress |
 | [WI-RENAME](Work-Items/WI-RENAME__rename-package-and-binary.md) | enabler | - | Move to a src layout with byte-census and dupfind entry points | A | 3 | 3 | in_progress |
-| [WI-QUALITY](Work-Items/WI-QUALITY__quality-infrastructure.md) | enabler | - | Provide snapshot, coverage, and CI infrastructure | A | 4 | 2 | proposed |
+| [WI-QUALITY](Work-Items/WI-QUALITY__quality-infrastructure.md) | enabler | - | Provide snapshot, coverage, and CI infrastructure | A | 4 | 2 | in_progress |
 | [WI-SAFETY](Work-Items/WI-SAFETY__read-only-safety.md) | enabler | - | Enforce the read-only guarantee in code and tests | A | 5 | 5 | proposed |
 | [WI-CORE](Work-Items/WI-CORE__observation-core.md) | enabler | - | Provide the observation model, cost meter, errors, and rendering | A | 6 | 8 | proposed |
 | [WI-SUGGESTIONS](Work-Items/WI-SUGGESTIONS__risk-ordered-suggestions.md) | story | - | Provide the risk-ordered cleanup suggestion catalog | A | 7 | 2 | proposed |
