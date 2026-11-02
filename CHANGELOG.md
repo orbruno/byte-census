@@ -4,6 +4,12 @@ All notable changes to this project are recorded here.
 
 ## Unreleased
 
+### Added
+
+- `byte-census artifacts scan ROOT` lists `node_modules`, `.venv`, `venv`, and
+  `target` (beside `Cargo.toml`) with allocated size, project, modification
+  time, and a remove-and-regenerate suggestion.
+
 ### Fixed
 
 - `dupfind` hashes through the safe reader: dataless (evicted) files are not
