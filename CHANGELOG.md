@@ -4,14 +4,7 @@ All notable changes to this project are recorded here.
 
 ## Unreleased
 
-### Documentation
-
-- `SKILL.md` now defines suggestion risk levels, the classification fields, caveats, and the reclaim estimate, explains duplicate group sums and the arbitrary kept copy, states that artifact suggestions also regenerate, lists the main options per command, and makes the classify-then-ask rule self-contained.
-- Added a root `SKILL.md` for agents, rewrote the README for byte-census 2.0.0 with help blocks checked against the live `--help` output, rewrote the agent extension in `gemini-extensions/` for byte-census and tracked its manifest, marked `SPECIFICATION.md` as the frozen v1 `dupfind` specification, and stated in `disk --help` that `disk map` is the one command without the `scan` verb.
-
-### Changed
-
-- `artifacts scan` discovery lists directories through the shared safe lister.
+## 2.0.0 - 2026-11-02
 
 ### Added
 
@@ -29,60 +22,6 @@ All notable changes to this project are recorded here.
 - `byte-census artifacts scan ROOT` lists `node_modules`, `.venv`, `venv`, and
   `target` (beside `Cargo.toml`) with allocated size, project, modification
   time, and a remove-and-regenerate suggestion.
-
-### Fixed
-
-- `disk map` keeps the npm location uncertainty when another tool shares
-  the same cache location.
-- `dupfind` hashes each file beneath its resolved scan root, opening every path
-  component without following symlinks and checking the file against the lstat
-  recorded during collection. A parent directory swapped for a symlink during a
-  scan becomes a per-file warning (exit 0) instead of redirecting the read.
-  Output for ordinary trees is unchanged. With `--compare`, each side uses its
-  own root.
-- `duplicates scan` reopens each file beneath its own scan root, one directory at a time without following symlinks, and checks it against the file the walk recorded; a file whose parent was swapped for a symlink is never read and is listed as `changed_during_scan`.
-- `caches scan` and `duplicates scan --no-recursive` list a root through one shared
-  helper (`fsread.list_directory`): a dataless root is never listed (partial,
-  exit 0) and a foreign-device child is a skipped mount.
-- `caches scan` keeps the tool name and catalog suggestion of a tool cache that
-  lies inside a cache folder, is the Caches root, or shares a location with
-  another tool; an unreadable `~/.npmrc` is reported in `incomplete_coverage`
-  and marks the npm location uncertain; the `hard_links_merged` caveat no longer
-  depends on measurement order; a tool cache that vanishes is a coverage gap;
-  a tool cache location of `/`, the data volume, or the home directory is refused.
-- `dupfind` hashes through the safe reader: dataless (evicted) files are not
-  downloaded, FIFOs and other special files do not hang the scan, and a file
-  swapped for a symlink is not followed. Each becomes a per-file warning on
-  stderr and the run still exits 0. Output for regular files is unchanged.
-- `dupfind --output` writes undecodable path bytes faithfully, and a failed write
-  removes the file it created (only if it is still the same inode) and exits 1
-  with "Cannot write output file" instead of a traceback.
-
-### Changed
-
-- `dupfind` enumerates directories through the safe reader: it no longer
-  descends into other volumes or dataless (evicted) directories, which are
-  reported as warnings on stderr (exit 0). Output for ordinary trees is unchanged.
-- The contract now states the two `duplicates scan` ordering rules separately: an inode's primary name is its shallowest name, then code-point order; copies in a group, the kept copy, the removal command, and the reclaimable estimate follow code-point order of primary names. Output is unchanged.
-- `dupfind --output FILE` now creates the file exclusively. An existing file or
-  a symlink (dangling or not) at the path exits 3, writes nothing, and names the
-  path on stderr; there is no `--force`. A missing parent directory still exits 1.
-- `dupfind` prints a deprecation notice on stderr (also with `--quiet`); stdout is
-  unchanged. The adapter will be removed in 3.0.0.
-- The `byte-census` group reports usage errors as JSON on stderr instead of
-  Click's plain-text usage message; the exit code stays 2.
-- A missing option value and an interruption (Ctrl-C) now name the subcommand
-  in the error's `help`, and stderr holds exactly one JSON object. Every runner
-  failure other than a rejected argv (including an untrusted executable path
-  and oversized output) exits 4.
-- `meta.cost.elapsed_s` is defined as the time from the start of the command
-  callback until the envelope is complete, just before serialization.
-- Snapshots keep field order and the cost counters; only `elapsed_s`,
-  `captured_at`, integer `st_dev`, and finding IDs are masked, and every
-  finding ID is checked against the ID rule before masking.
-
-### Added
-
 - `byte-census docker scan` reports Docker-reported disk usage per type, the image inventory, dangling image count, and stopped containers; sizes are never added to host totals, and a missing CLI or stopped daemon exits 4.
 - Suggestion hardening: operands with control characters use `$'...'` quoting,
   artifact suggestions accept only the fixed regeneration command for their
@@ -141,6 +80,67 @@ All notable changes to this project are recorded here.
   not part of the public contract, which exercises the scaffold end to end.
 - Snapshot helper normalizes `meta.scope.roots[].st_dev` and path-derived IDs
   in `id`, `finding_id`, `finding_ids`, and `suggestion_ids`.
+- `byte-census` entry point, an empty command group. `byte-census --version`
+  prints `byte-census 2.0.0`; bare invocation shows help and exits 0.
+- Dev dependency group with pytest, pytest-cov, and ruff.
+
+### Changed
+
+- `artifacts scan` discovery lists directories through the shared safe lister.
+- `dupfind` enumerates directories through the safe reader: it no longer
+  descends into other volumes or dataless (evicted) directories, which are
+  reported as warnings on stderr (exit 0). Output for ordinary trees is unchanged.
+- The contract now states the two `duplicates scan` ordering rules separately: an inode's primary name is its shallowest name, then code-point order; copies in a group, the kept copy, the removal command, and the reclaimable estimate follow code-point order of primary names. Output is unchanged.
+- `dupfind --output FILE` now creates the file exclusively. An existing file or
+  a symlink (dangling or not) at the path exits 3, writes nothing, and names the
+  path on stderr; there is no `--force`. A missing parent directory still exits 1.
+- `dupfind` prints a deprecation notice on stderr (also with `--quiet`); stdout is
+  unchanged. The adapter will be removed in 3.0.0.
+- The `byte-census` group reports usage errors as JSON on stderr instead of
+  Click's plain-text usage message; the exit code stays 2.
+- A missing option value and an interruption (Ctrl-C) now name the subcommand
+  in the error's `help`, and stderr holds exactly one JSON object. Every runner
+  failure other than a rejected argv (including an untrusted executable path
+  and oversized output) exits 4.
+- `meta.cost.elapsed_s` is defined as the time from the start of the command
+  callback until the envelope is complete, just before serialization.
+- Snapshots keep field order and the cost counters; only `elapsed_s`,
+  `captured_at`, integer `st_dev`, and finding IDs are masked, and every
+  finding ID is checked against the ID rule before masking.
+- The project is now `byte-census` 2.0.0. The package moved from
+  `duplicate_finder_cli` to a src layout at `src/byte_census/`.
+- The v1 duplicate finder code now lives in `byte_census.legacy`, split into
+  small modules. `report_writer.py` is the only module that writes files.
+- The `dupfind` help text now uses an `Example:` block (previously `Examples:`)
+  and accepts `-h` as well as `--help`. All other `dupfind` behavior is unchanged.
+
+### Fixed
+
+- `disk map` keeps the npm location uncertainty when another tool shares
+  the same cache location.
+- `dupfind` hashes each file beneath its resolved scan root, opening every path
+  component without following symlinks and checking the file against the lstat
+  recorded during collection. A parent directory swapped for a symlink during a
+  scan becomes a per-file warning (exit 0) instead of redirecting the read.
+  Output for ordinary trees is unchanged. With `--compare`, each side uses its
+  own root.
+- `duplicates scan` reopens each file beneath its own scan root, one directory at a time without following symlinks, and checks it against the file the walk recorded; a file whose parent was swapped for a symlink is never read and is listed as `changed_during_scan`.
+- `caches scan` and `duplicates scan --no-recursive` list a root through one shared
+  helper (`fsread.list_directory`): a dataless root is never listed (partial,
+  exit 0) and a foreign-device child is a skipped mount.
+- `caches scan` keeps the tool name and catalog suggestion of a tool cache that
+  lies inside a cache folder, is the Caches root, or shares a location with
+  another tool; an unreadable `~/.npmrc` is reported in `incomplete_coverage`
+  and marks the npm location uncertain; the `hard_links_merged` caveat no longer
+  depends on measurement order; a tool cache that vanishes is a coverage gap;
+  a tool cache location of `/`, the data volume, or the home directory is refused.
+- `dupfind` hashes through the safe reader: dataless (evicted) files are not
+  downloaded, FIFOs and other special files do not hang the scan, and a file
+  swapped for a symlink is not followed. Each becomes a per-file warning on
+  stderr and the run still exits 0. Output for regular files is unchanged.
+- `dupfind --output` writes undecodable path bytes faithfully, and a failed write
+  removes the file it created (only if it is still the same inode) and exits 1
+  with "Cannot write output file" instead of a traceback.
 
 ### Security
 
@@ -156,12 +156,10 @@ All notable changes to this project are recorded here.
   is rechecked for `SF_DATALESS` on its descriptor; a dataless directory is
   never listed and no child is looked up in it.
 - An `fstat` failure inside the openat chain no longer leaks the descriptor.
-
 - Fix: after a changed ancestor ends a deep branch whose descriptors were
   evicted, the walker no longer looks up the name it had already taken from
   the dropped directory in a surviving ancestor, which could report a path
   that was never listed there or visit a sibling twice.
-
 - `fsread.walk` accepts `prune`, and the new `fsread.walk_beneath` reaches a
   directory below a scan root through an `O_NOFOLLOW` openat chain, checks
   its identity, and walks it on the scan root's device. Disk map's pruned
@@ -172,7 +170,6 @@ All notable changes to this project are recorded here.
   `changed_during_scan` and contributes no bytes.
 - A failing `fstat` after opening a file beneath a root no longer leaks the
   descriptor.
-
 - `fsread.walk` and `fsread.list_directory` open every directory with
   `O_RDONLY | O_DIRECTORY | O_NOFOLLOW` relative to its parent's
   descriptor, confirm its identity with `fstat`, list it with `scandir` on
@@ -185,7 +182,6 @@ All notable changes to this project are recorded here.
 - New `fsread.open_regular_file_beneath` and `fsread.hash_file_beneath` open
   a file through an `O_NOFOLLOW` chain from its scan root, with an optional
   identity check against the walk's `lstat`.
-
 - The runner pins `df`, `diskutil`, and `tmutil` to absolute system paths,
   rejects relative `PATH` lookups for docker, uv, and brew, runs every
   child with `cwd="/"` in its own session, kills the whole process group on
@@ -214,19 +210,7 @@ All notable changes to this project are recorded here.
   fsread walker (`os.scandir`, `os.listdir`, `os.walk`, `Path.iterdir`,
   `Path.glob`, `Path.rglob`, `Path.walk`) only in `fsread.py`.
 
-## 2.0.0
+### Documentation
 
-### Changed
-
-- The project is now `byte-census` 2.0.0. The package moved from
-  `duplicate_finder_cli` to a src layout at `src/byte_census/`.
-- The v1 duplicate finder code now lives in `byte_census.legacy`, split into
-  small modules. `report_writer.py` is the only module that writes files.
-- The `dupfind` help text now uses an `Example:` block (previously `Examples:`)
-  and accepts `-h` as well as `--help`. All other `dupfind` behavior is unchanged.
-
-### Added
-
-- `byte-census` entry point, an empty command group. `byte-census --version`
-  prints `byte-census 2.0.0`; bare invocation shows help and exits 0.
-- Dev dependency group with pytest, pytest-cov, and ruff.
+- `SKILL.md` now defines suggestion risk levels, the classification fields, caveats, and the reclaim estimate, explains duplicate group sums and the arbitrary kept copy, states that artifact suggestions also regenerate, lists the main options per command, and makes the classify-then-ask rule self-contained.
+- Added a root `SKILL.md` for agents, rewrote the README for byte-census 2.0.0 with help blocks checked against the live `--help` output, rewrote the agent extension in `gemini-extensions/` for byte-census and tracked its manifest, marked `SPECIFICATION.md` as the frozen v1 `dupfind` specification, and stated in `disk --help` that `disk map` is the one command without the `scan` verb.
