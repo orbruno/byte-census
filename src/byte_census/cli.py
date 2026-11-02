@@ -14,6 +14,7 @@ from typing import Any
 import click
 
 from byte_census import __version__
+from byte_census.checks.docker import docker
 from byte_census.errors import (
     TOOL_HELP,
     emit_error,
@@ -81,6 +82,7 @@ def main(ctx: click.Context) -> None:
 
 
 main.add_command(selftest)
+main.add_command(docker)
 
 
 if __name__ == "__main__":
