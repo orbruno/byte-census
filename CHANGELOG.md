@@ -7,6 +7,9 @@ All notable changes to this project are recorded here.
 ### Added
 
 - `byte-census docker scan` rejects unusable `docker system df` output (exit 4) and reports unparseable fields as null with a partial status; totals are null when any component is unknown.
+- `byte-census disk map --scan-root PATH` measures data-volume roots, their
+  largest first-level folders and large files, and reconciles the total with
+  `df -k /System/Volumes/Data` as a signed delta.
 - `byte-census artifacts scan ROOT` lists `node_modules`, `.venv`, `venv`, and
   `target` (beside `Cargo.toml`) with allocated size, project, modification
   time, and a remove-and-regenerate suggestion.

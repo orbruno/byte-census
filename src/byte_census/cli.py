@@ -16,6 +16,7 @@ import click
 from byte_census import __version__
 from byte_census.checks.artifacts import artifacts
 from byte_census.checks.caches_command import caches_group
+from byte_census.checks.disk_map_command import disk
 from byte_census.checks.docker import docker
 from byte_census.checks.duplicates import duplicates
 from byte_census.errors import (
@@ -89,6 +90,7 @@ main.add_command(docker)
 main.add_command(artifacts)
 main.add_command(duplicates)
 main.add_command(caches_group)
+main.add_command(disk)
 
 
 if __name__ == "__main__":
