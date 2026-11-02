@@ -5,7 +5,7 @@ generated: true
 generator: scrum-pm-artifacts
 generator_version: 1.3.1
 view_id: dashboard
-source_fingerprint: sha256:c5a319b7949f7467505e3ac9a304c3943521ad720eee36c6859ff43caf61346e
+source_fingerprint: sha256:9880cd98fff83bdbc691e71925761193f7241aa0829d183a799629c66086282b
 ---
 
 # Project Management Dashboard - duplicate-finder-cli
@@ -16,21 +16,21 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 
 ## Overall Progress
 
-- Completed estimated points: 61
+- Completed estimated points: 62
 - Total included estimated points: 70
-- Remaining estimated points: 9
-- Estimated progress: 61 / 70 (87%)
+- Remaining estimated points: 8
+- Estimated progress: 62 / 70 (89%)
 - Unestimated active Work Items: 5
 
 ## Delivery Summary
 
-- Effective active Work Items: 8
-- Completed Work Items: 18
+- Effective active Work Items: 7
+- Completed Work Items: 19
 - Excluded Work Items: 0
-- Estimated active points: 9
-- Completed points: 61
+- Estimated active points: 8
+- Completed points: 62
 - Unestimated active Work Items: 5
-- Estimate coverage: 3/8 active items
+- Estimate coverage: 2/7 active items
 
 ## Epic Progress
 
@@ -42,7 +42,6 @@ byte-census is a deterministic, read-only command-line tool that measures macOS 
 
 | ID | Kind | Epic | Title | Priority | Rank | Points | State |
 |---|---|---|---|---|---:|---:|---|
-| [WI-RELEASE](Work-Items/WI-RELEASE__release-2-0-0.md) | enabler | - | Release byte-census 2.0.0 locally and on GitHub | C | 3 | 1 | proposed |
 | [WI-PARALLEL-ADAPTIVE](Work-Items/WI-PARALLEL-ADAPTIVE__adaptive-parallel-traversal.md) | enabler | - | Adopt adaptive parallel traversal behind --jobs | D | 2 | 5 | proposed |
 | [WI-FSREAD-SPLIT](Work-Items/WI-FSREAD-SPLIT__split-fsread-and-drop-anchored-path.md) | enabler | - | Split fsread into focused modules and drop AnchoredPath | D | 3 | 3 | proposed |
 | [WI-SKILL-ABSORB](Work-Items/WI-SKILL-ABSORB__absorb-storage-audit-skill.md) | enabler | - | Absorb the storage-audit skill into the byte-census SKILL.md | E | 1 | null | proposed |

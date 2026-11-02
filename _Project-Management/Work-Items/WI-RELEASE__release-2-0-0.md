@@ -8,14 +8,16 @@ profile: compact
 title: "Release byte-census 2.0.0 locally and on GitHub"
 parent: null
 points: 1
-status: proposed
+status: done
 definition_of_done:
   path: ../Definition-of-Done.md
   version: "0.1.0"
 dependencies: 
   - WI-VERIFY
 design_refs: []
-verification_refs: []
+verification_refs:
+  - ../../CHANGELOG.md
+  - ../../pyproject.toml
 superseded_by: null
 relocated_to: null
 disposition_reason: null
@@ -44,7 +46,10 @@ Required checks:
 
 Evidence:
 
-- Not yet executed.
+- AC-01: the GitHub repository was renamed to orbruno/byte-census on 2026-11-02 after explicit owner authorization; the old URL redirects, and the local remote and pyproject repository URL were updated (d96d684).
+- AC-02: `uv tool install --editable .` from the current path replaced the stale duplicate-finder-cli tool; `~/.local/bin/byte-census --version` prints `byte-census 2.0.0`, and the installed `dupfind` and `byte-census` produce output identical to the locked environment on a fixture (the tool environment resolved rich 15.0.0, the lock pins 14.2.0).
+- AC-03: annotated tag v2.0.0 at b984aa1 on feat/byte-census, pushed to origin, after CI run 41431865988 passed on macos-latest. The changelog was consolidated into a dated 2.0.0 section first.
+- Not done in this item: merging feat/byte-census into main, which was not part of the authorization.
 
 ---
 Last Updated: 2026-11-02
