@@ -69,6 +69,20 @@ def _identity_details(placement: Placement) -> dict[str, Any]:
     return {"tool": scope.tool}
 
 
+def _tool_details(placement: Placement) -> dict[str, Any]:
+    """Tool associations a tool cache finding keeps (quantities.md)."""
+    scope = placement.scope
+    details: dict[str, Any] = {}
+    if scope.other_tools:
+        details["other_tools"] = [
+            {"tool": tool, "location_source": source}
+            for tool, source in scope.other_tools
+        ]
+    if scope.uncertain:
+        details["location_uncertain"] = scope.uncertain
+    return details
+
+
 def _hidden_by(path: str, coverage: Sequence[CoverageEntry]) -> str | None:
     holders = [entry.path for entry in coverage if is_inside(path, entry.path)]
     return max(holders, key=len) if holders else None
@@ -91,6 +105,7 @@ def unit(
         **_identity_details(placement),
         "counted_allocated_bytes": own,
         "overlap": placement.overlap,
+        **_tool_details(placement),
     }
     if not shown.observed:
         details |= {

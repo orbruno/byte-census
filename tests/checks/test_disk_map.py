@@ -438,6 +438,8 @@ def test_top_truncates_display_after_complete_totals(
         "top": 1,
         "large_file_min_mb": 500,
         "skip_categories": False,
+        "tree_depth": 4,
+        "tree_min_mb": 100,
     }
     for key in ("measured_allocated_bytes",):
         assert cut["data"]["summary"][key] == full["data"]["summary"][key]

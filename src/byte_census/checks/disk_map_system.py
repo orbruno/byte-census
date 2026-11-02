@@ -167,9 +167,8 @@ def read_system(run: Run) -> SystemContext:
     try:
         docker = _docker(answer)
     except Unusable as error:
-        answer = Answer(
-            "docker", None, UnavailableSource("docker", "failed", str(error))
-        )
+        problem = UnavailableSource("docker", "failed", str(error))
+        answer = Answer("docker", None, problem, answer.stdout_bytes)
         docker = _docker(answer)
     fields.append(("docker_informational", docker))
     problems.extend([answer.problem] if answer.problem else [])

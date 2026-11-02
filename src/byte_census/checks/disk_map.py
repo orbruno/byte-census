@@ -7,8 +7,8 @@ the optional system sources, locate the categories and tool caches (unless
 walked scope once in a single process with one shared identity ledger, then
 build findings from complete totals and cut the display to `--top` last.
 
-Seam (later Work Item, not implemented here): WI-DISK-MAP-TREE adds the
-`tree` section in `_extra_sections`.
+The folder tree (`data.tree`) is totalled during the same walks; see
+`disk_map_tree`.
 """
 
 import errno
@@ -48,6 +48,7 @@ from byte_census.checks.disk_map_roots import (
 from byte_census.checks.disk_map_scopes import (
     ROOT,
     DeclaredScope,
+    Displayed,
     Placement,
     displayed_totals,
     plan_scopes,
@@ -55,6 +56,7 @@ from byte_census.checks.disk_map_scopes import (
 )
 from byte_census.checks.disk_map_see_check import SeeCheckRules
 from byte_census.checks.disk_map_system import Run, SystemContext, read_system
+from byte_census.checks.disk_map_tree import build_tree
 from byte_census.checks.disk_map_walk import (
     Ledger,
     ScopeWalk,
@@ -85,6 +87,8 @@ __all__ = [
 DATA_VOLUME_MOUNT = "/System/Volumes/Data"
 DEFAULT_TOP = 30
 DEFAULT_LARGE_FILE_MIN_MB = 500
+DEFAULT_TREE_DEPTH = 4
+DEFAULT_TREE_MIN_MB = 100
 MIB = 1024 * 1024
 
 
@@ -133,12 +137,16 @@ class Options:
     top: int = DEFAULT_TOP
     large_file_min_mb: int = DEFAULT_LARGE_FILE_MIN_MB
     skip_categories: bool = False
+    tree_depth: int = DEFAULT_TREE_DEPTH
+    tree_min_mb: int = DEFAULT_TREE_MIN_MB
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "top": self.top,
             "large_file_min_mb": self.large_file_min_mb,
             "skip_categories": self.skip_categories,
+            "tree_depth": self.tree_depth,
+            "tree_min_mb": self.tree_min_mb,
         }
 
 
@@ -174,11 +182,12 @@ def _unreachable(request: WalkRequest, error: OSError) -> ScopeWalk:
     return unreached_walk(request, gap)
 
 
-def _measure(placements: tuple[Placement, ...], large_min: int) -> Measured:
+def _measure(placements: tuple[Placement, ...], options: Options) -> Measured:
     ledger = Ledger()
     walks: list[ScopeWalk] = []
+    large_min = options.large_file_min_mb * MIB
     for plan in walk_plans(placements):
-        request = WalkRequest(plan.scope, plan.inner, plan.excluded)
+        request = WalkRequest(plan.scope, plan.inner, plan.excluded, options.tree_depth)
         try:
             walks.append(walk_scope(request, ledger, large_min))
         except OSError as error:
@@ -190,12 +199,19 @@ def _views(measured: Measured) -> dict[tuple[str, str], ViewTotals]:
     return {view.key: view for walk in measured.walks for view in walk.views}
 
 
+def _shown(measured: Measured) -> dict[tuple[str, str], Displayed]:
+    """Displayed totals of every declared scope, unions resolved."""
+    views = _views(measured)
+    return displayed_totals(measured.placements, views, measured.ledger.merged_views())
+
+
 def _units(
-    measured: Measured, rules: SeeCheckRules, coverage: Sequence[CoverageEntry]
+    measured: Measured,
+    shown: Mapping[tuple[str, str], Displayed],
+    rules: SeeCheckRules,
+    coverage: Sequence[CoverageEntry],
 ) -> list[Unit]:
     """Reconciliation units in attribution precedence order."""
-    views = _views(measured)
-    shown = displayed_totals(measured.placements, views, measured.ledger.merged_views())
     counted = {w.path: w.counted_allocated_bytes for w in measured.walks}
     return [
         unit(
@@ -210,14 +226,26 @@ def _units(
 
 
 def _extra_sections(
-    usage: DfUsage, system: SystemContext, units: Sequence[Unit]
+    usage: DfUsage, system: SystemContext, units: Sequence[Unit], tree: dict[str, Any]
 ) -> dict[str, Any]:
-    """`reconciliation` and `system`; seam: WI-DISK-MAP-TREE adds `tree`."""
+    """`reconciliation`, `system`, and `tree`, in contract order."""
     contributions = [Contribution(u.finding.id, u.counted) for u in units]
     return {
         "reconciliation": reconciliation(usage, contributions),
         "system": {"df_data_volume": usage.to_dict(), **dict(system.fields)},
+        "tree": tree,
     }
+
+
+def _tree(
+    measured: Measured,
+    shown: Mapping[tuple[str, str], Displayed],
+    roots: Sequence[DeclaredScope],
+    options: Options,
+) -> dict[str, Any]:
+    nodes = [node for walk in measured.walks for node in walk.tree_nodes]
+    sizes = [(r.path, shown[(ROOT, r.path)].allocated_bytes) for r in roots]
+    return build_tree(sizes, nodes, options.tree_depth, options.tree_min_mb * MIB)
 
 
 @dataclass(frozen=True)
@@ -257,7 +285,7 @@ def _gather(
     categories, tools = _managed(env, options)
     scopes = (*roots, *categories.scopes, *tools.scopes)
     placements = plan_scopes(scopes)
-    measured = _measure(placements, options.large_file_min_mb * MIB)
+    measured = _measure(placements, options)
     return Gathered(measured, usage, system, (categories, tools)), scopes
 
 
@@ -268,7 +296,8 @@ def disk_map(
     gathered, scopes = _gather(env, scan_roots, options)
     tool_paths = [s.path for s in scopes if s.kind == "tool_cache"]
     rules = SeeCheckRules.for_home(env.home, env.volume.mount, tool_paths)
-    units = _units(gathered.measured, rules, gathered.coverage)
+    shown = _shown(gathered.measured)
+    units = _units(gathered.measured, shown, rules, gathered.coverage)
     views = list(_views(gathered.measured).values())
     ledger = gathered.measured.ledger
     merged_inodes = frozenset(k for k in ledger.link_visits if ledger.merged(k))
@@ -280,8 +309,9 @@ def disk_map(
             *large_files(views, depth, merged_inodes, rules),
         ]
     )
-    extra = _extra_sections(gathered.usage, gathered.system, units)
     roots = [s for s in scopes if s.kind == ROOT]
+    tree = _tree(gathered.measured, shown, roots, options)
+    extra = _extra_sections(gathered.usage, gathered.system, units, tree)
     summary = {
         "root_count": len(roots),
         "finding_count": len(findings),

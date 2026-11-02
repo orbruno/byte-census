@@ -1,0 +1,10 @@
+0	<FIXTURE>/scan/empty
+3072	<FIXTURE>/scan/archive
+72	<FIXTURE>/scan/projects/app/src/deep
+84	<FIXTURE>/scan/projects/app/src
+88	<FIXTURE>/scan/projects/app
+88	<FIXTURE>/scan/projects
+40	<FIXTURE>/scan/docs
+1536	<FIXTURE>/scan/media/clips
+4608	<FIXTURE>/scan/media
+9032	<FIXTURE>/scan

@@ -69,6 +69,21 @@ def disk() -> None:
     default=False,
     help="Measure only the scan roots: no macOS categories and no tool caches.",
 )
+@click.option(
+    "--tree-depth",
+    type=click.IntRange(min=0),
+    default=disk_map.DEFAULT_TREE_DEPTH,
+    show_default=True,
+    help="Folder levels below each root shown in the tree.",
+)
+@click.option(
+    "--tree-min-mb",
+    type=click.IntRange(min=0),
+    default=disk_map.DEFAULT_TREE_MIN_MB,
+    show_default=True,
+    metavar="MB",
+    help="Show only tree folders of at least this many MiB.",
+)
 @format_option
 @click.pass_context
 def map_command(
@@ -77,6 +92,8 @@ def map_command(
     top: int,
     large_file_min_mb: int,
     skip_categories: bool,
+    tree_depth: int,
+    tree_min_mb: int,
     output_format: str,
 ) -> None:
     """
@@ -102,6 +119,8 @@ def map_command(
         top=top,
         large_file_min_mb=large_file_min_mb,
         skip_categories=skip_categories,
+        tree_depth=tree_depth,
+        tree_min_mb=tree_min_mb,
     )
     run_observation(
         ctx,

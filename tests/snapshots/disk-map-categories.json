@@ -640,6 +640,22 @@
         "see_check": "docker scan"
       }
     },
+    "tree": {
+      "depth": 4,
+      "min_bytes": 104857600,
+      "roots": [
+        {
+          "path": "<ROOT>/Users/example/Library/Application Support",
+          "allocated_bytes": 557056,
+          "children": []
+        },
+        {
+          "path": "<ROOT>/Users/example/Library/Developer/Xcode",
+          "allocated_bytes": 290816,
+          "children": []
+        }
+      ]
+    },
     "suggestions": []
   },
   "meta": {
@@ -667,7 +683,9 @@
       "options": {
         "top": 30,
         "large_file_min_mb": 0,
-        "skip_categories": false
+        "skip_categories": false,
+        "tree_depth": 4,
+        "tree_min_mb": 100
       },
       "skipped_mounts": []
     },

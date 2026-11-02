@@ -25,6 +25,7 @@ InodeKey = tuple[int, int]
 ViewKey = tuple[str, str]  # (kind, path)
 LinkBytes = tuple[InodeKey, int, int]  # (inode, allocated, logical)
 FIRST_LEVEL_VIEW = "first_level"
+TREE_NODE = "tree_node"
 LARGE_FILE_LIMIT = 20
 
 
@@ -182,6 +183,7 @@ class ScopeWalk:
     entries_visited: int
     coverage: tuple[CoverageEntry, ...]
     skipped_mounts: tuple[str, ...]
+    tree_nodes: tuple[ViewTotals, ...] = ()
 
 
 def walk_pruned(
@@ -206,7 +208,11 @@ def walk_pruned(
 class _WalkTally:
     """Mutable accumulator for one walked scope; `result` freezes it."""
 
-    def __init__(self, scope: ViewSpec, inner: tuple[ViewSpec, ...]) -> None:
+    def __init__(
+        self, scope: ViewSpec, inner: tuple[ViewSpec, ...], tree_depth: int = 0
+    ) -> None:
+        self.tree_depth = tree_depth
+        self.tree: dict[tuple[str, str], _View] = {}
         self.scope = _View(scope.kind, scope.path, scope.path, scope)
         self.scope.observed = True
         self.pending: dict[InodeKey, list[ViewSpec]] = {}
@@ -235,17 +241,43 @@ class _WalkTally:
         ]
 
     def _first_level(
-        self, prefix: str, view: _View, path: str, is_dir: bool
+        self, prefix: str, view: _View, parts: list[str], is_dir: bool
     ) -> _View | None:
-        if path == prefix or not view.spec.first_level:
-            return None
-        first = path[len(prefix.rstrip("/")) + 1 :].split("/", 1)[0]
-        key = prefix.rstrip("/") + "/" + first
-        if key == path and is_dir:
-            target = view.path.rstrip("/") + "/" + first
+        key = prefix.rstrip("/") + "/" + parts[0]
+        if len(parts) == 1 and is_dir:
+            target = view.path.rstrip("/") + "/" + parts[0]
             self.first[key] = _View(FIRST_LEVEL_VIEW, target, view.path, view.spec)
             self.first[key].observed = True
         return self.first.get(key)
+
+    def _tree_nodes(self, view: _View, parts: list[str], is_dir: bool) -> list[_View]:
+        """Tree folders of a root view holding this entry, down to the depth.
+
+        A folder's node is created when the folder itself is visited (walks
+        are pre-order), so its ancestors' nodes always exist already.
+        """
+        found: list[_View] = []
+        for level in range(1, min(self.tree_depth, len(parts)) + 1):
+            relative = "/".join(parts[:level])
+            key = (view.path, relative)
+            if level == len(parts) and is_dir:
+                target = view.path.rstrip("/") + "/" + relative
+                self.tree[key] = _View(TREE_NODE, target, view.path, view.spec)
+            node = self.tree.get(key)
+            if node is not None:
+                found.append(node)
+        return found
+
+    def _subviews(
+        self, prefix: str, view: _View, path: str, is_dir: bool
+    ) -> list[_View]:
+        """First-level and tree views of a root view that hold this entry."""
+        if path == prefix or not view.spec.first_level:
+            return []
+        parts = path[len(prefix.rstrip("/")) + 1 :].split("/")
+        first = self._first_level(prefix, view, parts, is_dir)
+        found = [first] if first is not None else []
+        return found + self._tree_nodes(view, parts, is_dir)
 
     def views_for(self, path: str, info: Any) -> list[_View]:
         is_dir = stat.S_ISDIR(info.st_mode)
@@ -254,9 +286,7 @@ class _WalkTally:
         views: list[_View] = []
         for prefix, view in self._containing(path):
             views.append(view)
-            first = self._first_level(prefix, view, path, is_dir)
-            if first is not None:
-                views.append(first)
+            views.extend(self._subviews(prefix, view, path, is_dir))
         return views
 
     def add_inode(self, path: str, info: Any, large_min: int, ledger: Ledger) -> None:
@@ -274,7 +304,7 @@ class _WalkTally:
         """Offer the file to the selection buffer of every root view holding it."""
         inode = (info.st_dev, info.st_ino)
         for view in views:
-            if view.kind != FIRST_LEVEL_VIEW and view.spec.large_files:
+            if view.kind not in (FIRST_LEVEL_VIEW, TREE_NODE) and view.spec.large_files:
                 size, allocated = info.st_size, allocated_of(info)
                 view.add_large(LargeFile(path, view.path, size, allocated, inode))
 
@@ -302,16 +332,22 @@ class _WalkTally:
             entries_visited=self.entries,
             coverage=tuple(self.coverage),
             skipped_mounts=tuple(self.mounts),
+            tree_nodes=tuple(node.totals() for node in self.tree.values()),
         )
 
 
 @dataclass(frozen=True)
 class WalkRequest:
-    """One scope to walk: itself, the scopes shown inside it, and prunes."""
+    """One scope to walk: itself, the scopes shown inside it, and prunes.
+
+    `tree_depth` is how many folder levels below each root view the walk
+    also totals for the folder tree (0: none).
+    """
 
     scope: ViewSpec
     inner: tuple[ViewSpec, ...] = ()
     excluded: frozenset[InodeKey] = frozenset()
+    tree_depth: int = 0
 
 
 def walk_scope(request: WalkRequest, ledger: Ledger, large_min_bytes: int) -> ScopeWalk:
@@ -319,7 +355,7 @@ def walk_scope(request: WalkRequest, ledger: Ledger, large_min_bytes: int) -> Sc
 
     Raises OSError when the scope cannot be examined with `lstat`.
     """
-    tally = _WalkTally(request.scope, request.inner)
+    tally = _WalkTally(request.scope, request.inner, request.tree_depth)
     root = request.scope.path
     info = fsread.lstat(root)
     tally.add_inode(root, info, large_min_bytes, ledger)

@@ -205,6 +205,22 @@
         "see_check": "docker scan"
       }
     },
+    "tree": {
+      "depth": 4,
+      "min_bytes": 104857600,
+      "roots": [
+        {
+          "path": "<ROOT>/Users/example/Documents",
+          "allocated_bytes": 1998848,
+          "children": []
+        },
+        {
+          "path": "<ROOT>/Users/example/Music",
+          "allocated_bytes": 200704,
+          "children": []
+        }
+      ]
+    },
     "suggestions": []
   },
   "meta": {
@@ -232,7 +248,9 @@
       "options": {
         "top": 30,
         "large_file_min_mb": 1,
-        "skip_categories": false
+        "skip_categories": false,
+        "tree_depth": 4,
+        "tree_min_mb": 100
       },
       "skipped_mounts": []
     },

@@ -10,6 +10,8 @@ All notable changes to this project are recorded here.
 
 ### Added
 
+- `byte-census disk map` reports a depth-limited folder tree per scan root
+  (`--tree-depth`, default 4; `--tree-min-mb`, default 100) from the same walk.
 - `byte-census disk map` also measures the ten macOS categories and the uv,
   npm, and Homebrew caches (counted once against the roots), reports
   `df -k /`, `diskutil info /`, the local snapshot count, and Docker usage as

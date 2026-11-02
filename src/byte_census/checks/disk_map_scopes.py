@@ -36,6 +36,9 @@ class DeclaredScope:
     given: str = ""
     label: str = ""
     tool: str = ""
+    location_source: str = ""
+    uncertain: str | None = None
+    other_tools: tuple[tuple[str, str], ...] = ()
 
     def contains(self, other: "DeclaredScope") -> bool:
         return self.identity == other.identity or self.identity in other.chain

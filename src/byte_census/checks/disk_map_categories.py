@@ -15,7 +15,8 @@ import errno
 import os
 import stat
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Any
 
 from byte_census.checks.disk_map_roots import (
     DataVolume,
@@ -90,7 +91,7 @@ class Located:
 Locate = Callable[[str], DeclaredScope | CoverageEntry | str | None]
 
 
-def _locator(volume: DataVolume, lstat: Lstat, kind: str, **labels: str) -> Locate:
+def _locator(volume: DataVolume, lstat: Lstat, kind: str, **labels: Any) -> Locate:
     def locate(path: str) -> DeclaredScope | CoverageEntry | str | None:
         try:
             info = lstat(path)
@@ -113,12 +114,23 @@ def _locator(volume: DataVolume, lstat: Lstat, kind: str, **labels: str) -> Loca
     return locate
 
 
+def _merge_tool(first: DeclaredScope, later: DeclaredScope) -> DeclaredScope:
+    """Keep one scope per location; a later tool there is recorded, not counted."""
+    if later.kind != TOOL_CACHE:
+        return first
+    other = (later.tool, later.location_source)
+    return replace(first, other_tools=(*first.other_tools, other))
+
+
 def _collect(outcomes: Sequence[DeclaredScope | CoverageEntry | str | None]) -> Located:
     scopes: list[DeclaredScope] = []
     for outcome in outcomes:
-        if isinstance(outcome, DeclaredScope) and all(
-            s.identity != outcome.identity for s in scopes
-        ):
+        if not isinstance(outcome, DeclaredScope):
+            continue
+        same = [i for i, s in enumerate(scopes) if s.identity == outcome.identity]
+        if same:
+            scopes[same[0]] = _merge_tool(scopes[same[0]], outcome)
+        else:
             scopes.append(outcome)
     return Located(
         scopes=tuple(scopes),
@@ -139,11 +151,19 @@ def locate_categories(
 def locate_tool_caches(
     environ: Mapping[str, str], run: ToolRunner, volume: DataVolume, lstat: Lstat
 ) -> Located:
-    """uv, npm, and brew cache scopes, each location once, first tool wins."""
+    """uv, npm, and brew cache scopes, each location once under the first
+    tool; later tools at that location are kept in `other_tools`."""
     tools = resolve_tool_caches(environ, run)
     found = _collect(
         [
-            _locator(volume, lstat, TOOL_CACHE, tool=cache.tool)(cache.path)
+            _locator(
+                volume,
+                lstat,
+                TOOL_CACHE,
+                tool=cache.tool,
+                location_source=cache.location_source,
+                uncertain=cache.uncertain,
+            )(cache.path)
             for cache in tools.caches
         ]
     )
