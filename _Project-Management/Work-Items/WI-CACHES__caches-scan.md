@@ -34,7 +34,7 @@ A user sees the largest folders in `~/Library/Caches` plus uv, npm, and Homebrew
 ## Acceptance Criteria
 
 - AC-01: `byte-census caches scan` computes complete totals for every cache folder before truncating the display to `--top` (default 20).
-- AC-02: uv, npm, and brew cache locations come from the tools through the runner and are counted once even when inside `~/Library/Caches`.
+- AC-02: uv and brew cache locations come from the tools through the runner; the npm cache location is resolved by reading `npm_config_cache` and `$HOME/.npmrc` (default `$HOME/.npm`) without running npm, because every npm invocation prunes its debug logs; each location is counted once even when inside `~/Library/Caches`.
 - AC-03: A missing tool is reported as unavailable in `meta`, not as an error.
 - AC-04: Tool caches carry their catalog suggestions (`uv cache prune`, `brew cleanup`, `npm cache verify`), marked low risk.
 
