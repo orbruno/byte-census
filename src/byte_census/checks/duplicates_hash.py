@@ -1,8 +1,10 @@
 """Hashing stages of `duplicates scan` (WI-DUPLICATES AC-01, AC-02, AC-05).
 
-Every content read goes through `fsread.open_regular_file`, which accepts
-regular files only, refuses dataless files, and checks the descriptor's
-identity. Each read also compares the descriptor's `fstat` before and after
+Every content read goes through `fsread.open_regular_file_beneath`, which
+opens each directory from the inode's own scan root with O_NOFOLLOW, accepts
+regular files only, refuses dataless files, and checks that the file is the
+inode the walk recorded. A parent swapped for a symlink therefore cannot
+redirect a read outside the root. Each read also compares the descriptor's `fstat` before and after
 reading with the size and mtime seen at collection; any difference, a short
 read, or a vanished file excludes the file and lists it in
 `incomplete_coverage`. Bytes returned by `os.read` are counted even when the
@@ -69,9 +71,12 @@ def _excluded(inode: Inode, read: int, reason: str, code: Any, op: str) -> Diges
 
 
 def _refused(inode: Inode, error: fsread.FsReadError) -> Digest:
-    reason = "dataless" if isinstance(error, fsread.DatalessFileError) else CHANGED
-    operation = "open" if reason == "dataless" else "hash"
-    return _excluded(inode, 0, reason, None, operation)
+    if isinstance(error, fsread.DatalessFileError):
+        return _excluded(inode, 0, "dataless", None, "open")
+    swapped = (fsread.IdentityChangedError, fsread.NotRegularFileError)
+    if isinstance(error, swapped):
+        return _excluded(inode, 0, CHANGED, None, "hash")
+    return _excluded(inode, 0, error.reason, None, "open")
 
 
 def digest_inode(inode: Inode, limit: int | None) -> Digest:
@@ -80,7 +85,9 @@ def digest_inode(inode: Inode, limit: int | None) -> Digest:
     digest = hashlib.sha256()
     total = 0
     try:
-        with fsread.open_regular_file(inode.primary) as fd:
+        with fsread.open_regular_file_beneath(
+            inode.root, inode.primary, expected=inode.expected
+        ) as fd:
             if not _unchanged(os.fstat(fd), inode):
                 return _excluded(inode, 0, CHANGED, None, "hash")
             try:

@@ -36,6 +36,7 @@ All notable changes to this project are recorded here.
   scan becomes a per-file warning (exit 0) instead of redirecting the read.
   Output for ordinary trees is unchanged. With `--compare`, each side uses its
   own root.
+- `duplicates scan` reopens each file beneath its own scan root, one directory at a time without following symlinks, and checks it against the file the walk recorded; a file whose parent was swapped for a symlink is never read and is listed as `changed_during_scan`.
 - `caches scan` and `duplicates scan --no-recursive` list a root through one shared
   helper (`fsread.list_directory`): a dataless root is never listed (partial,
   exit 0) and a foreign-device child is a skipped mount.

@@ -30,6 +30,13 @@ class Inode:
     size: int
     allocated: int
     mtime_ns: int
+    name_roots: tuple[tuple[str, str], ...] = ()
+    expected: Any = None
+
+    @property
+    def root(self) -> str:
+        """The scan root the primary name was found under."""
+        return dict(self.name_roots)[self.primary]
 
     @property
     def primary(self) -> str:
@@ -76,7 +83,7 @@ def _is_candidate(info: Any, min_size: int) -> bool:
 class _Seen:
     """Raw observations of one walk, before inodes are merged."""
 
-    files: tuple[tuple[str, str, Any], ...]
+    files: tuple[tuple[str, str, str, Any], ...]
     entries: int
     coverage: tuple[CoverageEntry, ...]
     mounts: tuple[str, ...]
@@ -87,7 +94,7 @@ def _coverage(item: fsread.WalkError) -> CoverageEntry:
 
 
 def _observe(spec: RootSpec, recursive: bool, min_size: int) -> _Seen:
-    files: list[tuple[str, str, Any]] = []
+    files: list[tuple[str, str, str, Any]] = []
     coverage: list[CoverageEntry] = []
     mounts: list[str] = []
     entries = 0
@@ -103,18 +110,22 @@ def _observe(spec: RootSpec, recursive: bool, min_size: int) -> _Seen:
             if item.is_dataless:
                 coverage.append(CoverageEntry(item.path, "dataless", None, "lstat"))
             else:
-                files.append((item.path, spec.side, item.stat))
+                files.append((item.path, spec.side, spec.path, item.stat))
     return _Seen(tuple(files), entries, tuple(coverage), tuple(mounts))
 
 
-def _merge(files: Iterable[tuple[str, str, Any]]) -> tuple[Inode, ...]:
-    """One Inode per (st_dev, st_ino); names and sides are unions."""
-    names: dict[tuple[int, int], set[str]] = {}
+def _merge(files: Iterable[tuple[str, str, str, Any]]) -> tuple[Inode, ...]:
+    """One Inode per (st_dev, st_ino); names and sides are unions.
+
+    Each name keeps the scan root it was found under (the first root, when
+    roots overlap), so hashing can reopen it beneath that root.
+    """
+    names: dict[tuple[int, int], dict[str, str]] = {}
     sides: dict[tuple[int, int], set[str]] = {}
     infos: dict[tuple[int, int], Any] = {}
-    for path, side, info in files:
+    for path, side, root, info in files:
         key = (info.st_dev, info.st_ino)
-        names.setdefault(key, set()).add(path)
+        names.setdefault(key, {}).setdefault(path, root)
         sides.setdefault(key, set()).add(side)
         infos.setdefault(key, info)
     inodes = (
@@ -125,6 +136,8 @@ def _merge(files: Iterable[tuple[str, str, Any]]) -> tuple[Inode, ...]:
             size=info.st_size,
             allocated=info.st_blocks * 512,
             mtime_ns=info.st_mtime_ns,
+            name_roots=tuple(sorted(names[key].items())),
+            expected=info,
         )
         for key, info in infos.items()
     )

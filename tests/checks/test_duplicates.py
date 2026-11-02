@@ -133,13 +133,13 @@ def test_small_files_are_opened_once(
     tree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     opened: list[str] = []
-    real = fsread.open_regular_file
+    real = fsread.open_regular_file_beneath
 
-    def spy(path: Any) -> Any:
+    def spy(root: Any, path: Any, expected: Any = None) -> Any:
         opened.append(os.path.basename(os.fspath(path)))
-        return real(path)
+        return real(root, path, expected)
 
-    monkeypatch.setattr(fsread, "open_regular_file", spy)
+    monkeypatch.setattr(fsread, "open_regular_file_beneath", spy)
     scan(str(tree))
 
     assert opened.count("s1.txt") == 1
@@ -424,18 +424,18 @@ def test_compare_reports_only_groups_spanning_both_roots(tmp_path: Path) -> None
 
 def changing_opener(
     target: str, on_call: int, action: Callable[[Path], None]
-) -> Callable[[Any], Any]:
+) -> Callable[..., Any]:
     """Wrap the safe opener so `action` runs before the n-th open of target."""
-    real = fsread.open_regular_file
+    real = fsread.open_regular_file_beneath
     seen = {"count": 0}
 
     @contextmanager
-    def opener(path: Any) -> Iterator[int]:
+    def opener(root: Any, path: Any, expected: Any = None) -> Iterator[int]:
         if os.path.basename(os.fspath(path)) == target:
             seen["count"] += 1
             if seen["count"] == on_call:
                 action(Path(os.fspath(path)))
-        with real(path) as fd:
+        with real(root, path, expected) as fd:
             yield fd
 
     return opener
@@ -472,7 +472,7 @@ def test_changed_file_is_excluded_and_listed(
     on_call: int,
 ) -> None:
     monkeypatch.setattr(
-        fsread, "open_regular_file", changing_opener("b.bin", on_call, action)
+        fsread, "open_regular_file_beneath", changing_opener("b.bin", on_call, action)
     )
     payload = scan(str(tree))
 
@@ -505,7 +505,7 @@ def test_vanished_file_is_excluded_and_listed(
 ) -> None:
     monkeypatch.setattr(
         fsread,
-        "open_regular_file",
+        "open_regular_file_beneath",
         changing_opener("b.bin", 2, lambda path: path.unlink()),
     )
     payload = scan(str(tree))
@@ -523,11 +523,90 @@ def test_file_replaced_by_directory_is_changed(
         path.mkdir()
 
     monkeypatch.setattr(
-        fsread, "open_regular_file", changing_opener("d.bin", 1, to_directory)
+        fsread, "open_regular_file_beneath", changing_opener("d.bin", 1, to_directory)
     )
     payload = scan(str(tree))
 
     assert coverage_of(payload) == [("d.bin", "changed_during_scan", None, "hash")]
+
+
+def test_parent_swapped_for_symlink_is_never_read_outside_root(
+    tree: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Between collection and hashing, `sub` moves outside the root and a
+    symlink takes its place, so `sub/s2.txt` keeps its identity, size, and
+    mtime but is reachable only through the symlink."""
+    outside = tmp_path / "outside"
+    outside_ino = os.stat(tree / "sub" / "s2.txt").st_ino
+    real_stage = duplicates_hash.hash_stage
+    real_read = os.read
+    outside_bytes = {"count": 0}
+
+    def swap_then_hash(inodes: Any, limit: Any) -> Any:
+        if not outside.exists():
+            os.rename(tree / "sub", outside)
+            os.symlink(outside, tree / "sub")
+        return real_stage(inodes, limit)
+
+    def spying_read(fd: int, size: int) -> bytes:
+        chunk = real_read(fd, size)
+        if os.fstat(fd).st_ino == outside_ino:
+            outside_bytes["count"] += len(chunk)
+        return chunk
+
+    monkeypatch.setattr(duplicates_hash, "hash_stage", swap_then_hash)
+    monkeypatch.setattr(duplicates_hash.os, "read", spying_read)
+    payload = scan(str(tree))
+
+    assert outside_bytes["count"] == 0
+    assert all("s2.txt" not in p for g in groups(payload) for p in g)
+    assert ("s2.txt", "changed_during_scan", None, "hash") in coverage_of(payload)
+    assert payload["meta"]["cost"]["content_bytes_read"] == (
+        4 * PARTIAL + len(b"small copy") + 3 * BIG
+    )
+
+
+def test_compare_opens_each_side_beneath_its_own_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    (left / "one.txt").write_bytes(b"same")
+    (right / "two.txt").write_bytes(b"same")
+    calls: list[tuple[str, str]] = []
+    real = fsread.open_regular_file_beneath
+
+    def spy(root: Any, path: Any, expected: Any = None) -> Any:
+        assert expected is not None
+        calls.append((os.fspath(root), os.fspath(path)))
+        return real(root, path, expected)
+
+    monkeypatch.setattr(fsread, "open_regular_file_beneath", spy)
+    payload = scan(str(left), "--compare", str(right))
+
+    assert len(groups(payload)) == 1
+    assert sorted(calls) == [
+        (str(left.resolve()), str(left.resolve() / "one.txt")),
+        (str(right.resolve()), str(right.resolve() / "two.txt")),
+    ]
+
+
+def test_other_refusals_are_listed_with_their_reason(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = fsread.open_regular_file_beneath
+
+    def opener(root: Any, path: Any, expected: Any = None) -> Any:
+        if os.path.basename(os.fspath(path)) == "d.bin":
+            raise fsread.NotBeneathRootError(path, "not beneath")
+        return real(root, path, expected)
+
+    monkeypatch.setattr(fsread, "open_regular_file_beneath", opener)
+    payload = scan(str(tree))
+
+    assert coverage_of(payload) == [("d.bin", "read_error", None, "open")]
 
 
 def test_read_error_is_listed(tree: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -565,14 +644,14 @@ def test_dataless_at_open_is_listed(
     def refuse(path: Any) -> Any:
         raise fsread.DatalessFileError(path)
 
-    real = fsread.open_regular_file
+    real = fsread.open_regular_file_beneath
 
-    def opener(path: Any) -> Any:
+    def opener(root: Any, path: Any, expected: Any = None) -> Any:
         if os.path.basename(os.fspath(path)) == "d.bin":
             return refuse(path)
-        return real(path)
+        return real(root, path, expected)
 
-    monkeypatch.setattr(fsread, "open_regular_file", opener)
+    monkeypatch.setattr(fsread, "open_regular_file_beneath", opener)
     payload = scan(str(tree))
 
     assert coverage_of(payload) == [("d.bin", "dataless", None, "open")]
