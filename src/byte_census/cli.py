@@ -15,9 +15,9 @@ import click
 
 from byte_census import __version__
 from byte_census.checks.artifacts import artifacts
+from byte_census.checks.caches_command import caches_group
 from byte_census.checks.docker import docker
 from byte_census.checks.duplicates import duplicates
-from byte_census.checks.caches_command import caches_group
 from byte_census.errors import (
     TOOL_HELP,
     emit_error,
