@@ -7,7 +7,7 @@ import pytest
 from click.testing import CliRunner
 
 from byte_census import fsread
-from byte_census.legacy import report_writer
+from byte_census.legacy import report_writer, scan
 from byte_census.legacy.dupfind import find
 from byte_census.legacy.hashing import calculate_hash
 from byte_census.legacy.scan import find_duplicates_single
@@ -60,19 +60,23 @@ def test_unreadable_candidate_is_a_warning_and_exit_0(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "a.txt").write_bytes(b"same")
-    (tmp_path / "b.txt").write_bytes(b"same")
-    fifo_target = tmp_path / "b.txt"
-    real = fsread.lstat
+    target = tmp_path / "b.txt"
+    target.write_bytes(b"same")
+    real = scan._repeated_size_candidates
 
-    def swapped(path: object) -> os.stat_result:
-        if os.fspath(path) == str(fifo_target):  # type: ignore[arg-type]
-            return os.lstat(tmp_path)  # a directory: not a regular file
-        return real(path)  # type: ignore[arg-type]
+    def swap_for_fifo(size_groups: dict[int, list[Path]]) -> list[Path]:
+        candidates = real(size_groups)
+        target.unlink()
+        os.mkfifo(target)
+        return candidates
 
-    monkeypatch.setattr(fsread, "lstat", swapped)
+    monkeypatch.setattr(scan, "_repeated_size_candidates", swap_for_fifo)
     duplicates, errors, _ = find_duplicates_single(tmp_path, quiet=True)
     assert duplicates == {}
     assert len(errors) == 1 and "b.txt" in errors[0]
+    monkeypatch.undo()
+    target.unlink()
+    target.write_bytes(b"same")
     result = CliRunner().invoke(find, [str(tmp_path), "--quiet"])
     assert result.exit_code == 0
 

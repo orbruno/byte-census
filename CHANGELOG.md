@@ -30,6 +30,12 @@ All notable changes to this project are recorded here.
 
 ### Fixed
 
+- `dupfind` hashes each file beneath its resolved scan root, opening every path
+  component without following symlinks and checking the file against the lstat
+  recorded during collection. A parent directory swapped for a symlink during a
+  scan becomes a per-file warning (exit 0) instead of redirecting the read.
+  Output for ordinary trees is unchanged. With `--compare`, each side uses its
+  own root.
 - `caches scan` and `duplicates scan --no-recursive` list a root through one shared
   helper (`fsread.list_directory`): a dataless root is never listed (partial,
   exit 0) and a foreign-device child is a skipped mount.

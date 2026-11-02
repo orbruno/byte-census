@@ -3,6 +3,7 @@
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from rich.progress import track
 
@@ -26,6 +27,14 @@ def _walk_items(path: Path, recursive: bool) -> Iterable[fsread.WalkItem]:
 def collect_files_with_errors(
     path: Path, recursive: bool = True, min_size: int = 0
 ) -> tuple[list[Path], list[str]]:
+    """Collect regular files and warnings; see collect_entries."""
+    entries, errors = collect_entries(path, recursive, min_size)
+    return sorted(entries), errors
+
+
+def collect_entries(
+    path: Path, recursive: bool = True, min_size: int = 0
+) -> tuple[dict[Path, Any], list[str]]:
     """
     Collect regular files from a path and the enumeration problems seen.
 
@@ -39,18 +48,19 @@ def collect_files_with_errors(
         min_size: Minimum file size in bytes to consider
 
     Returns:
-        Tuple of (sorted file paths, warning messages)
+        Tuple of ({file path: lstat recorded during collection}, warnings).
+        A single-file path has no recorded lstat (value None).
     """
     if not path.exists():
         raise FileNotFoundError(f"Path does not exist: {path}")
 
     if path.is_symlink():
-        return [], []
+        return {}, []
 
     if path.is_file():
-        return ([path] if path.stat().st_size >= min_size else []), []
+        return ({path: None} if path.stat().st_size >= min_size else {}), []
 
-    files: list[Path] = []
+    files: dict[Path, Any] = {}
     errors: list[str] = []
     for item in _walk_items(path, recursive):
         if isinstance(item, fsread.WalkError):
@@ -60,8 +70,8 @@ def collect_files_with_errors(
             and item.kind == "file"
             and item.stat.st_size >= min_size
         ):
-            files.append(Path(item.path))
-    return sorted(files), errors
+            files[Path(item.path)] = item.stat
+    return files, errors
 
 
 def group_files_by_size(files: list[Path]) -> tuple[dict[int, list[Path]], list[str]]:
@@ -95,6 +105,11 @@ def _common_size_candidates(
     return sorted(file_path for size in common_sizes for file_path in size_groups[size])
 
 
+def _hash_root(path: Path) -> Path:
+    """Directory the safe reader anchors on: the scan root, or a file's parent."""
+    return path.parent if path.is_file() else path
+
+
 def find_duplicates_single(
     path: Path,
     recursive: bool = True,
@@ -115,7 +130,8 @@ def find_duplicates_single(
         duplicates_dict: {hash: [file_paths]} for files with duplicates
         errors_list: List of error messages for files that couldn't be processed
     """
-    files, walk_errors = collect_files_with_errors(path, recursive, min_size)
+    entries, walk_errors = collect_entries(path, recursive, min_size)
+    files = sorted(entries)
 
     if not files:
         return {}, walk_errors, 0
@@ -133,7 +149,10 @@ def find_duplicates_single(
     hash_map: defaultdict[str, list[Path]] = defaultdict(list)
     for file_path in file_iterator:
         try:
-            hash_map[calculate_hash(file_path)].append(file_path)
+            digest = calculate_hash(
+                file_path, root=_hash_root(path), expected=entries[file_path]
+            )
+            hash_map[digest].append(file_path)
         except OSError as e:
             errors.append(str(e))
 
@@ -148,6 +167,7 @@ def _hash_candidates(
     source: Path,
     description: str,
     quiet: bool,
+    entries: dict[Path, Any],
 ) -> tuple[defaultdict[str, list[Path]], list[str]]:
     """Hash candidate files, announcing progress unless quiet."""
     hash_map: defaultdict[str, list[Path]] = defaultdict(list)
@@ -167,7 +187,10 @@ def _hash_candidates(
     )
     for file_path in file_iterator:
         try:
-            hash_map[calculate_hash(file_path)].append(file_path)
+            digest = calculate_hash(
+                file_path, root=_hash_root(source), expected=entries[file_path]
+            )
+            hash_map[digest].append(file_path)
         except OSError as e:
             errors.append(str(e))
 
@@ -196,8 +219,9 @@ def find_duplicates_compare(
         duplicates_dict: {hash: [all_matching_files]} (flattened from both dirs)
         errors_list: List of error messages
     """
-    files1, walk_errors1 = collect_files_with_errors(path1, recursive, min_size)
-    files2, walk_errors2 = collect_files_with_errors(path2, recursive, min_size)
+    entries1, walk_errors1 = collect_entries(path1, recursive, min_size)
+    entries2, walk_errors2 = collect_entries(path2, recursive, min_size)
+    files1, files2 = sorted(entries1), sorted(entries2)
     size_groups1, errors1 = group_files_by_size(files1)
     size_groups2, errors2 = group_files_by_size(files2)
     errors = walk_errors1 + walk_errors2 + errors1 + errors2
@@ -207,10 +231,10 @@ def find_duplicates_compare(
     candidates2 = _common_size_candidates(size_groups2, common_sizes)
 
     hash_map1, hash_errors1 = _hash_candidates(
-        candidates1, path1, "Hashing directory 1...", quiet
+        candidates1, path1, "Hashing directory 1...", quiet, entries1
     )
     hash_map2, hash_errors2 = _hash_candidates(
-        candidates2, path2, "Hashing directory 2...", quiet
+        candidates2, path2, "Hashing directory 2...", quiet, entries2
     )
     errors = errors + hash_errors1 + hash_errors2
 
