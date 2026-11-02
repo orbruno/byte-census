@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 
+from byte_census import command_policy as runner_policy
 from byte_census import runner
 from byte_census.runner import (
     CommandLaunchError,
@@ -33,7 +34,6 @@ CONTRACT_ARGVS = [
     ["docker", "images", "-f", "dangling=true", "-q"],
     ["docker", "ps", "-a", "-f", "status=exited", "--format", "{{json .}}"],
     ["uv", "cache", "dir"],
-    ["npm", "config", "get", "cache"],
     ["brew", "--cache"],
     ["df", "-k", "/"],
     ["df", "-k", "/System/Volumes/Data"],
@@ -44,7 +44,6 @@ CONTRACT_ARGVS = [
 EXPECTED_TIMEOUTS = {
     "docker": 120,
     "uv": 60,
-    "npm": 60,
     "brew": 60,
     "df": 60,
     "diskutil": 60,
@@ -179,6 +178,7 @@ REJECTED = [
     ["brew", "--cache", "--verbose"],
     ["brew", "cleanup"],
     ["npm", "cache", "verify"],
+    ["npm", "config", "get", "cache"],
     ["df", "-k", "/Users"],
     ["df", "-k", "/", "/System/Volumes/Data"],
     ["df", "-h", "/"],
@@ -260,7 +260,7 @@ def test_relative_which_result_is_rejected() -> None:
 def test_empty_path_entry_cannot_run_planted_executables(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    for name in ("df", "docker", "uv", "npm", "brew"):
+    for name in ("df", "docker", "uv", "brew"):
         _plant(tmp_path, name)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PATH", "/nonexistent::/bin")
@@ -326,13 +326,10 @@ def child_env(argv: list[str]) -> dict[str, str]:
     return launcher.calls[0][1]["env"]
 
 
-def test_npm_environment_disables_log_files_and_update_checks() -> None:
-    assert child_env(["npm", "config", "get", "cache"]) == {
-        **BASE_ENV,
-        "npm_config_cache": "/custom/npm",
-        "npm_config_logs_max": "0",
-        "npm_config_update_notifier": "false",
-    }
+def test_npm_is_not_in_the_allowlist() -> None:
+    assert all(spec.argv[0] != "npm" for spec in runner.ALLOWED_COMMANDS)
+    assert "npm" not in runner_policy.TOOL_PASSTHROUGH
+    assert "npm" not in runner_policy.TOOL_SETTINGS
 
 
 def test_brew_environment_disables_updates_analytics_and_hints() -> None:
@@ -466,7 +463,7 @@ def test_vanished_executable_maps_to_not_installed() -> None:
     launcher = FakeLauncher(error=FileNotFoundError(2, "No such file"))
 
     with pytest.raises(ExecutableNotFoundError):
-        call(["npm", "config", "get", "cache"], launcher)
+        call(["brew", "--cache"], launcher)
 
 
 # L1: process groups, timeouts, and output caps.

@@ -58,7 +58,6 @@ TEMPLATES: tuple[CommandTemplate, ...] = (
         ("docker", "ps", "-a", "-f", "status=exited", "--format", JSON_FORMAT), 120
     ),
     CommandTemplate(("uv", "cache", "dir"), 60),
-    CommandTemplate(("npm", "config", "get", "cache"), 60),
     CommandTemplate(("brew", "--cache"), 60),
     CommandTemplate(("df", "-k", DF_MOUNT_POINT), 60),
     CommandTemplate(("diskutil", "info", "/"), 60),
@@ -94,14 +93,14 @@ BASE_PASSTHROUGH: tuple[str, ...] = ("PATH", "HOME", "USER", "TMPDIR")
 TOOL_PASSTHROUGH: Mapping[str, tuple[str, ...]] = {
     "docker": ("DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"),
     "uv": ("UV_CACHE_DIR", "XDG_CACHE_HOME"),
-    "npm": ("npm_config_cache", "NPM_CONFIG_CACHE"),
     "brew": ("HOMEBREW_CACHE",),
 }
 
 # Settings that switch off each tool's own writes (see argv-allowlist.md).
+# npm is deliberately absent: no setting makes it read-only, so its cache
+# location is read from configuration by byte_census.toolpaths instead.
 TOOL_SETTINGS: Mapping[str, Mapping[str, str]] = {
     "docker": {"DOCKER_CLI_HINTS": "false"},
-    "npm": {"npm_config_logs_max": "0", "npm_config_update_notifier": "false"},
     "brew": {
         "HOMEBREW_NO_AUTO_UPDATE": "1",
         "HOMEBREW_NO_ANALYTICS": "1",

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from tests.support.read_only_guard import (
+    ATTRIBUTE_ALLOWLISTS,
     MODULE_ALLOWLIST,
     PACKAGE_ALLOWLIST,
     PACKAGE_DIR,
@@ -70,7 +71,7 @@ def test_process_access_outside_runner_is_flagged(source: str) -> None:
 @pytest.mark.parametrize(
     "source",
     [
-        "import subprocess\nsubprocess.run(['x'], shell=False, timeout=1)\n",
+        "import subprocess\nsubprocess.Popen(['x'], shell=False)\n",
         "import shutil\nshutil.which('docker')\n",
         "from shutil import which\nwhich('uv')\n",
     ],
@@ -455,6 +456,91 @@ def test_module_allowlist_is_exactly_documented() -> None:
             "time",
             "typing",
             "unicodedata",
+            "click",
+            "rich",
+            "rich.console",
+            "rich.progress",
+            "rich.table",
+            "rich.text",
         }
     )
-    assert PACKAGE_ALLOWLIST == ("byte_census", "click", "rich")
+    assert PACKAGE_ALLOWLIST == ("byte_census",)
+
+
+def test_every_allowed_module_has_an_attribute_allowlist() -> None:
+    assert set(ATTRIBUTE_ALLOWLISTS) == set(MODULE_ALLOWLIST)
+
+
+# Second security review: chains through modules, unpacking, attribute allowlists.
+
+SECOND_REVIEW_BYPASSES = [
+    ("import contextlib\ncontextlib.os.remove(p)\n", "contextlib.os"),
+    ("import os.path\nos.path.os.unlink(p)\n", "os.path.os"),
+    ("from os.path import os as o2\n", "os.path.os"),
+    ("import rich.console\nrich.console.os.remove(p)\n", "rich.console.os"),
+    ("import json\njson.codecs.open('x', 'w')\n", "json.codecs"),
+    (
+        "import csv\ncsv.types.FunctionType(compile('1', 'x', 'eval'), {})()\n",
+        "csv.types",
+    ),
+    ("open(p, **{'mode': 'w'})\n", "unpacking"),
+    ("from pathlib import Path\nPath(p).open(**{'mode': 'a'})\n", "unpacking"),
+    ("import click\nclick.utils.open_file(p, 'w')\n", "click.utils"),
+    ("import click\nclick.termui.launch(p)\n", "click.termui"),
+    (
+        "import click\nclick.testing.CliRunner().isolated_filesystem()\n",
+        "click.testing",
+    ),
+    ("from click.testing import CliRunner\n", "click.testing"),
+    (
+        "import contextlib\ngetattr(contextlib, 'os').remove(p)\n",
+        "getattr on contextlib",
+    ),
+    ("import contextlib\nm = contextlib.os\nm.remove(p)\n", "contextlib.os"),
+    ("m.remove(p)\n", "remove"),
+    ("open(*args)\n", "unpacking"),
+    ("import io\nio.open(p, *rest)\n", "io.open"),
+    ("import os\nos.open(p, *flags)\n", "unpacking"),
+    ("import os\nos.open(p, **options)\n", "unpacking"),
+    ("from pathlib import Path\nPath.open(p, *rest)\n", "unpacking"),
+    ("import json\njson.dump(data, handle)\n", "not in the json allowlist"),
+    ("import time\nclock = time\n", "used as a value"),
+    ("import rich\nrich.get_console()\n", "not in the rich allowlist"),
+    ("import datetime\ndatetime.datetime.sys\n", "passes through a module"),
+    ("import errno\nerrno.os\n", "errno.os"),
+    ("import stat\nstat.os\n", "stat.os"),
+    ("x.rmtree('d')\n", "rmtree"),
+    ("x.truncate(0)\n", "truncate"),
+    ("x.makedirs('d')\n", "makedirs"),
+    ("x.utime(p)\n", "utime"),
+    ("x.copyfile('a', 'b')\n", "copyfile"),
+]
+
+
+@pytest.mark.parametrize(
+    ("source", "fragment"),
+    SECOND_REVIEW_BYPASSES,
+    ids=[b[0] for b in SECOND_REVIEW_BYPASSES],
+)
+def test_second_review_bypasses_are_caught(source: str, fragment: str) -> None:
+    assert_flags(source, fragment)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import stat\nclass Entry:\n    stat: int\n",
+        "import datetime\nnow = datetime.datetime.now()\n",
+        "import errno\ncode = errno.EACCES\nname = errno.errorcode.get(1)\n",
+        "import sys\nsys.stdout.isatty()\n",
+        (
+            "import click\n@click.option('--x', type=click.Choice(['a']))\n"
+            "def f(x):\n    click.echo(x)\n"
+        ),
+        "from rich.console import Console\nConsole(stderr=True)\n",
+        "import os\nos.open(p, os.O_RDONLY | os.O_NOFOLLOW)\n",
+        "items = []\nitems.pop()\n",
+    ],
+)
+def test_allowlisted_attribute_use_passes(source: str) -> None:
+    assert violations(source) == []

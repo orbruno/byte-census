@@ -34,6 +34,7 @@ from pathlib import Path
 from tests.support.guard_policy import (
     ALLOWED_IN,
     ATTR_BUILTINS,
+    ATTRIBUTE_ALLOWLISTS,
     CONDITIONAL_ATTRIBUTES,
     FORBIDDEN,
     FORBIDDEN_BUILTINS,
@@ -41,6 +42,7 @@ from tests.support.guard_policy import (
     MODE_OPENERS,
     MODULE_ALLOWLIST,
     MULTIPROCESSING,
+    OPENERS,
     OS_READ_FLAGS,
     PACKAGE_ALLOWLIST,
     PROCESS,
@@ -57,6 +59,7 @@ from tests.support.guard_policy import (
 )
 
 __all__ = [
+    "ATTRIBUTE_ALLOWLISTS",
     "MODULE_ALLOWLIST",
     "PACKAGE_ALLOWLIST",
     "PACKAGE_DIR",
@@ -144,12 +147,6 @@ def _writes(attr: str, call: ast.Call | None) -> bool:
     return attr in CONDITIONAL_ATTRIBUTES and not _conditional_ok(attr, call)
 
 
-def _restricted_target(target: str) -> bool:
-    """Report whether getattr-style access on target must be refused."""
-    restricted = target in VALUE_RESTRICTED or classify(target) is not None
-    return restricted or under(target, "byte_census")
-
-
 class _Guard(ast.NodeVisitor):
     def __init__(self, module: str, aliases: dict[str, str]) -> None:
         self.module = module
@@ -213,7 +210,7 @@ class _Guard(ast.NodeVisitor):
 
     def visit_Name(self, node: ast.Name) -> None:
         name = self.qualname(node)
-        if name is None:
+        if name is None or isinstance(node.ctx, (ast.Store, ast.Del)):
             return
         if name.startswith("builtins."):
             self.check_builtin_value(node)
@@ -253,6 +250,7 @@ class _Guard(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         name = self.qualname(node.func)
+        self.check_unpacking(node, name)
         if name == "os.open":
             self.check_os_open(node)
         elif name in MODE_OPENERS:
@@ -264,6 +262,19 @@ class _Guard(ast.NodeVisitor):
         else:
             self.visit(node.func)
         self.visit_all(node.args, (k.value for k in node.keywords))
+
+    def check_unpacking(self, node: ast.Call, name: str | None) -> None:
+        method_open = (
+            name is None
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "open"
+        )
+        if not (name in OPENERS or method_open):
+            return
+        starred = any(isinstance(arg, ast.Starred) for arg in node.args)
+        if starred or any(k.arg is None for k in node.keywords):
+            label = name or "Path.open"
+            self.report(node, WRITE, f"argument unpacking in {label} {outside(WRITE)}")
 
     def visit_all(self, *groups: Iterable[ast.AST]) -> None:
         for group in groups:
@@ -284,7 +295,7 @@ class _Guard(ast.NodeVisitor):
         attr = node.args[1] if len(node.args) > 1 else None
         if not isinstance(attr, ast.Constant) or not isinstance(attr.value, str):
             self.report(node, FORBIDDEN, f"{builtin} with a non-constant name")
-        elif target is not None and _restricted_target(target):
+        elif target is not None:
             self.report(node, FORBIDDEN, f"{builtin} on {target} is forbidden")
         else:
             self.check_constant_attr(node, attr.value)

@@ -68,6 +68,12 @@ A finding carries the caveat `hard_links_merged` when one of its inodes has anot
 - `disk map` additionally requires each root to resolve to the data volume (`/System/Volumes/Data`); see WI-DISK-MAP.
 - Firmlinks: on macOS the user data under `/Users`, `/Applications`, and similar paths lives on the data volume and appears under `/` through firmlinks. A walk that starts at `/` (on the read-only system volume) stops at the `st_dev` change and therefore skips that user data. This is expected, not a gap; disk map requires data-volume roots for this reason.
 
+## Tool cache locations
+
+- uv and brew report their cache locations through the runner (`uv cache dir`, `brew --cache`; see [argv-allowlist.md](argv-allowlist.md)).
+- Decision: the npm cache location is resolved by reading configuration, never by running npm, because every npm invocation writes or deletes debug logs and can create the cache directory. `byte_census.toolpaths.npm_cache_location` reads, in order: the `npm_config_cache` environment variable (matched case-insensitively, as npm does); a `cache=` line in `$HOME/.npmrc` (key=value lines, `#` and `;` comments ignored, a leading `~` and `${HOME}` expanded, read through the safe opener with a 1 MiB limit); otherwise the default `$HOME/.npm`. It creates nothing and reports which source decided the location.
+- Limitation: global npmrc files (`$PREFIX/etc/npmrc`, the builtin npmrc), project `.npmrc` files, `--userconfig` overrides, and environment substitutions other than `${HOME}` are not consulted. If one of them sets `cache`, byte-census reports a different location than npm would.
+
 ## Docker figures
 
 Docker figures are informational. They describe space inside Docker's own storage (on macOS, a virtual disk image such as `Docker.raw`) as Docker accounts for it.

@@ -128,6 +128,29 @@ def open_regular_file(path: StrPath) -> Iterator[int]:
         os.close(fd)
 
 
+class FileTooLargeError(FsReadError):
+    """The file exceeds the size limit for a small configuration read."""
+
+    reason = "too_large"
+
+    def __init__(self, path: StrPath, limit: int) -> None:
+        super().__init__(path, f"file exceeds {limit} bytes: {os.fspath(path)}")
+        self.limit = limit
+
+
+def read_small_file(path: StrPath, limit: int) -> bytes:
+    """Read a whole regular file of at most `limit` bytes through the safe opener."""
+    chunks: list[bytes] = []
+    total = 0
+    with open_regular_file(path) as fd:
+        while chunk := os.read(fd, CHUNK_SIZE):
+            total += len(chunk)
+            if total > limit:
+                raise FileTooLargeError(path, limit)
+            chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @dataclass(frozen=True)
 class FileHash:
     """Content digest of one file and the bytes read to compute it."""
