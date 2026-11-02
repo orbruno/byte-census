@@ -12,6 +12,7 @@ import pytest
 
 from tests.support.read_only_guard import (
     ATTRIBUTE_ALLOWLISTS,
+    FSREAD,
     MODULE_ALLOWLIST,
     PACKAGE_ALLOWLIST,
     PACKAGE_DIR,
@@ -176,8 +177,8 @@ def test_open_in_write_mode_is_flagged(source: str) -> None:
         "from pathlib import Path\nPath('x').open('rb')\n",
     ],
 )
-def test_open_for_reading_is_allowed(source: str) -> None:
-    assert violations(source) == []
+def test_open_for_reading_is_allowed_in_fsread(source: str) -> None:
+    assert violations(source, FSREAD) == []
 
 
 @pytest.mark.parametrize(
@@ -202,7 +203,7 @@ def test_os_open_with_write_or_unknown_flags_is_flagged(flags: str) -> None:
 def test_os_open_read_flags_are_allowed() -> None:
     source = "import os\nos.open('x', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)\n"
 
-    assert violations(source) == []
+    assert violations(source, FSREAD) == []
 
 
 def test_os_open_keyword_flags_are_checked() -> None:
@@ -259,7 +260,6 @@ def test_unlisted_os_function_is_flagged() -> None:
     [
         "import os\nos.lstat('x')\n",
         "import os\nos.fstat(3)\n",
-        "import os\nos.scandir('.')\n",
         "import os\nos.read(3, 10)\n",
         "import os\nos.close(3)\n",
         "import os\nos.path.join('a', 'b')\n",
@@ -538,7 +538,6 @@ def test_second_review_bypasses_are_caught(source: str, fragment: str) -> None:
             "def f(x):\n    click.echo(x)\n"
         ),
         "from rich.console import Console\nConsole(stderr=True)\n",
-        "import os\nos.open(p, os.O_RDONLY | os.O_NOFOLLOW)\n",
         "items = []\nitems.pop()\n",
     ],
 )
@@ -629,3 +628,85 @@ def test_package_names_that_are_not_modules_pass(source: str) -> None:
 def test_introspection_attributes_are_forbidden_in_any_position(name: str) -> None:
     assert_flags(f"x = y.{name}\n", name)
     assert_flags(f"import os\nx = os.{name}\n", name)
+
+
+# Closing review: content reads and directory enumeration outside fsread.
+
+CHECK_MODULE = "byte_census/checks/new_check.py"
+
+READERS = [
+    "open(p)\n",
+    "open(p, 'rb')\n",
+    "open(p, mode='r')\n",
+    "from pathlib import Path\nPath(p).open()\n",
+    "from pathlib import Path\nPath(p).open('rb')\n",
+    "from pathlib import Path\nPath(p).read_bytes()\n",
+    "from pathlib import Path\nPath(p).read_text()\n",
+    "from pathlib import Path\nPath.read_bytes(p)\n",
+    "from pathlib import Path\nPath.read_text(p)\n",
+    "reader = p.read_bytes\n",
+    "getattr(p, 'read_text')()\n",
+    "import os\nos.open(p, os.O_RDONLY)\n",
+    "import os\nos.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)\n",
+]
+
+ENUMERATORS = [
+    "import os\nos.scandir(p)\n",
+    "import os\nos.listdir(p)\n",
+    "import os\nos.walk(p)\n",
+    "from os import scandir\nscandir(p)\n",
+    "from pathlib import Path\nPath(p).iterdir()\n",
+    "from pathlib import Path\nPath(p).glob('*')\n",
+    "from pathlib import Path\nPath(p).rglob('*')\n",
+    "from pathlib import Path\nPath(p).walk()\n",
+    "from pathlib import Path\nPath.rglob(p, '*')\n",
+    "lister = p.iterdir\n",
+    "getattr(p, 'glob')('*')\n",
+]
+
+
+@pytest.mark.parametrize("source", READERS)
+def test_content_reads_outside_fsread_are_flagged(source: str) -> None:
+    assert_flags(source, "content read outside", CHECK_MODULE)
+
+
+@pytest.mark.parametrize("source", READERS)
+def test_content_reads_are_allowed_in_fsread(source: str) -> None:
+    assert violations(source, FSREAD) == []
+
+
+@pytest.mark.parametrize("source", ENUMERATORS)
+def test_enumeration_outside_fsread_is_flagged(source: str) -> None:
+    assert_flags(source, "directory enumeration outside", CHECK_MODULE)
+
+
+@pytest.mark.parametrize("source", ENUMERATORS)
+def test_enumeration_is_allowed_in_fsread(source: str) -> None:
+    assert violations(source, FSREAD) == []
+
+
+@pytest.mark.parametrize("source", ENUMERATORS)
+def test_writer_may_not_enumerate(source: str) -> None:
+    assert_flags(source, "directory enumeration outside", WRITER)
+
+
+def test_writer_may_open_its_output() -> None:
+    source = (
+        "import os\nfd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_EXCL)\n"
+        "handle = os.fdopen(fd, 'w')\n"
+    )
+
+    assert violations(source, WRITER) == []
+
+
+def test_fsread_still_may_not_open_for_writing() -> None:
+    assert_flags("import os\nos.open(p, os.O_WRONLY)\n", "os.open", FSREAD)
+    assert_flags("open(p, 'w')\n", "open", FSREAD)
+
+
+def test_walking_through_fsread_is_allowed_everywhere() -> None:
+    source = (
+        "from byte_census import fsread\nfor item in fsread.walk(root):\n    pass\n"
+    )
+
+    assert violations(source, CHECK_MODULE) == []

@@ -14,22 +14,27 @@ from pathlib import Path
 
 RUNNER = "byte_census/runner.py"
 WRITER = "byte_census/legacy/report_writer.py"
+FSREAD = "byte_census/fsread.py"
 MULTIPROCESSING_MODULES: frozenset[str] = frozenset()
 
 PROCESS = "process"
 WRITE = "write"
 FORBIDDEN = "forbidden"
 MULTIPROCESSING = "multiprocessing"
+READ = "read"
+ENUMERATE = "enumerate"
 
 ALLOWED_IN: dict[str, frozenset[str]] = {
     PROCESS: frozenset({RUNNER}),
     WRITE: frozenset({WRITER}),
     MULTIPROCESSING: MULTIPROCESSING_MODULES,
+    READ: frozenset({FSREAD, WRITER}),
+    ENUMERATE: frozenset({FSREAD}),
     FORBIDDEN: frozenset(),
 }
 
 OS_READ = frozenset(
-    {"lstat", "stat", "fstat", "scandir", "read", "close", "fspath", "fsencode"}
+    {"lstat", "stat", "fstat", "read", "close", "fspath", "fsencode"}
     | {"fsdecode", "environ", "getcwd", "strerror", "sep", "DirEntry"}
     | {"stat_result", "PathLike", "cpu_count", "error"}
 )
@@ -37,6 +42,9 @@ OS_READ_FLAGS = frozenset(
     {"O_RDONLY", "O_NOFOLLOW", "O_NONBLOCK", "O_CLOEXEC", "O_DIRECTORY"}
 )
 OS_RUNNER = frozenset({"killpg"})
+# Directory listing that bypasses the fsread walker's symlink, st_dev, and
+# dataless checks; allowed only in FSREAD.
+OS_ENUMERATE = frozenset({"scandir", "listdir", "walk", "fwalk"})
 OS_PROCESS = frozenset(
     {"fork", "forkpty", "posix_spawn", "posix_spawnp", "system", "popen"}
     | {"kill", "abort"}
@@ -81,7 +89,7 @@ ATTRIBUTE_ALLOWLISTS: dict[str, frozenset[str]] = {
     "hashlib": frozenset({"new", "sha256", "sha1", "md5", "blake2b"}),
     "io": frozenset({"StringIO", "BytesIO"}),
     "json": frozenset({"dumps", "loads", "JSONDecodeError"}),
-    "os": OS_READ | OS_RUNNER | OS_WRITE | {"open", "path"},
+    "os": OS_READ | OS_RUNNER | OS_WRITE | OS_ENUMERATE | {"open", "path"},
     "os.path": frozenset(
         {"isabs", "realpath", "join", "basename", "dirname", "abspath", "normpath"}
         | {"relpath", "split", "splitext", "sep", "commonpath", "isdir", "isfile"}
@@ -187,6 +195,12 @@ WRITE_ATTRIBUTES = frozenset(
     | {"lchown", "utime", "symlink", "mkfifo", "mknod", "copyfile", "copytree"}
     | {"copy2", "copymode", "copystat", "save_html", "save_text", "save_svg"}
 )
+# Content readers and directory enumerators, in any attribute position. They
+# bypass fsread's FIFO, symlink, dataless, and st_dev checks.
+READ_ATTRIBUTES = frozenset({"read_bytes", "read_text"})
+ENUMERATE_ATTRIBUTES = frozenset({"iterdir", "glob", "rglob", "walk", "scandir"})
+ENUMERATE_ATTRIBUTES = ENUMERATE_ATTRIBUTES | {"listdir"}
+
 # Ambiguous names: safe only in the call shapes checked by the guard.
 CONDITIONAL_ATTRIBUTES = frozenset({"copy", "replace", "open"})
 
@@ -203,6 +217,10 @@ def outside(category: str) -> str:
         return f"is process access outside {RUNNER}"
     if category == WRITE:
         return f"is a write operation outside {WRITER}"
+    if category == READ:
+        return f"is a content read outside {FSREAD} and {WRITER}"
+    if category == ENUMERATE:
+        return f"is directory enumeration outside {FSREAD}"
     if category == MULTIPROCESSING:
         return "is forbidden until WI-PARALLEL-WALK names a traversal module"
     return "is forbidden"
@@ -234,11 +252,22 @@ def attribute_allowed(module: str, attr: str) -> bool:
     return attr.startswith(prefixes) and attr.isupper() if prefixes else False
 
 
+def attribute_category(attr: str) -> tuple[str, str] | None:
+    """Classify a reader or enumerator method name in any attribute position."""
+    if attr in READ_ATTRIBUTES:
+        return READ, f"Path.{attr} {outside(READ)}"
+    if attr in ENUMERATE_ATTRIBUTES:
+        return ENUMERATE, f"Path.{attr} {outside(ENUMERATE)}"
+    return None
+
+
 def _classify_os(attr: str) -> tuple[str, str] | None:
     if attr in OS_READ or attr == "path" or attr.startswith("O_"):
         return None
     if attr == "open":
         return WRITE, "os.open referenced without a call; flags cannot be checked"
+    if attr in OS_ENUMERATE:
+        return ENUMERATE, f"os.{attr} {outside(ENUMERATE)}"
     if attr in OS_RUNNER:
         return PROCESS, f"os.{attr} {outside(PROCESS)}"
     if attr in OS_PROCESS or attr.startswith(OS_PROCESS_PREFIXES):
@@ -277,6 +306,9 @@ def _classify_deeper(
             module == "pathlib" and part in {"copy", "replace"}
         ):
             return WRITE, f"Path.{part} {outside(WRITE)}"
+        verdict = attribute_category(part)
+        if verdict is not None:
+            return verdict
     if name == "pathlib.Path.open":
         return WRITE, f"{name} referenced without a call; mode cannot be checked"
     return None

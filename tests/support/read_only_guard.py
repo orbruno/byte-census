@@ -53,6 +53,7 @@ from tests.support.guard_policy import (
     FORBIDDEN,
     FORBIDDEN_ATTRIBUTES,
     FORBIDDEN_BUILTINS,
+    FSREAD,
     MODE_OPENERS,
     MODULE_ALLOWLIST,
     MULTIPROCESSING,
@@ -60,11 +61,13 @@ from tests.support.guard_policy import (
     OS_READ_FLAGS,
     PACKAGE_ALLOWLIST,
     PROCESS,
+    READ,
     RUNNER,
     WATCHED_BUILTINS,
     WRITE,
     WRITE_ATTRIBUTES,
     WRITER,
+    attribute_category,
     classify,
     is_module_object,
     module_allowed,
@@ -74,6 +77,7 @@ from tests.support.guard_policy import (
 
 __all__ = [
     "ATTRIBUTE_ALLOWLISTS",
+    "FSREAD",
     "MODULE_ALLOWLIST",
     "PACKAGE_ALLOWLIST",
     "PACKAGE_DIR",
@@ -261,14 +265,22 @@ class _Guard(ast.NodeVisitor):
             self.report(node, WRITE, f"Path.{attr} {outside(WRITE)}")
         elif attr == "open" and call is not None:
             self.check_mode(call, _argument(call, 0, "mode"), "Path.open")
+            self.report(call, READ, f"Path.open {outside(READ)}")
+        else:
+            verdict = attribute_category(attr)
+            if verdict is not None:
+                self.report(node, *verdict)
 
     def visit_Call(self, node: ast.Call) -> None:
         name = self.qualname(node.func)
         self.check_unpacking(node, name)
         if name == "os.open":
             self.check_os_open(node)
+            self.report(node, READ, f"os.open {outside(READ)}")
         elif name in MODE_OPENERS:
             self.check_mode(node, _argument(node, MODE_OPENERS[name], "mode"), name)
+            label = "open()" if name == "builtins.open" else name
+            self.report(node, READ, f"{label} {outside(READ)}")
         elif name is not None and name.removeprefix("builtins.") in ATTR_BUILTINS:
             self.check_attr_builtin(node, name.removeprefix("builtins."))
         elif isinstance(node.func, ast.Attribute):
@@ -319,6 +331,10 @@ class _Guard(ast.NodeVisitor):
             self.report(node, FORBIDDEN, f"{attr} access is forbidden")
         elif attr in WRITE_ATTRIBUTES or attr in CONDITIONAL_ATTRIBUTES:
             self.report(node, WRITE, f"Path.{attr} {outside(WRITE)}")
+        else:
+            verdict = attribute_category(attr)
+            if verdict is not None:
+                self.report(node, *verdict)
 
     def check_os_open(self, node: ast.Call) -> None:
         flags = _argument(node, 1, "flags")

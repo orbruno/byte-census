@@ -138,6 +138,11 @@ All notable changes to this project are recorded here.
   `docs/contracts/quantities.md`.
 - An npm `cache=` value must be absolute after expanding `~`, `$HOME`, or
   `${HOME}`; otherwise it is reported in `note` and the next source is used.
+- The AST guard allows content reads (`open`, `Path.open`,
+  `Path.read_bytes`, `Path.read_text`, `os.open`) only in `fsread.py` and
+  `legacy/report_writer.py`, and directory enumeration that bypasses the
+  fsread walker (`os.scandir`, `os.listdir`, `os.walk`, `Path.iterdir`,
+  `Path.glob`, `Path.rglob`, `Path.walk`) only in `fsread.py`.
 
 ## 2.0.0
 
