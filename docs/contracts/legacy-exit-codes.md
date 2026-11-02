@@ -29,9 +29,11 @@ Exit 3 details:
 
 ## Engine under v2
 
-Orchestrator decision 2026-11-02: dupfind keeps the v1 scanner in `byte_census.legacy` and does not use the new duplicates engine, because the owner decision is a frozen v1 adapter. Its results therefore keep v1 content semantics: empty files can group when `--min-size` is 0, hard-linked names are reported as duplicates, mount points under the root are crossed, and files are hashed as found. The new engine's corrections are available only through `byte-census duplicates scan`.
+Orchestrator decision 2026-11-02: dupfind keeps the v1 scanner in `byte_census.legacy` and does not use the new duplicates engine, because the owner decision is a frozen v1 adapter. Its results therefore keep v1 content semantics: empty files can group when `--min-size` is 0, hard-linked names are reported as duplicates, and files are hashed as found. The new engine's corrections are available only through `byte-census duplicates scan`.
 
-The only v2 behavior changes in dupfind are the exit 3 output collision above, the deprecation notice on stderr, and the help layout (`Usage:` and `Example:` block).
+Enumeration goes through `fsread` (`walk` for recursive mode, `list_directory` for `--no-recursive`). dupfind no longer descends into other volumes (a different `st_dev` than the root) and never lists a dataless (evicted) directory. Each skipped dataless or unreadable directory is reported as a per-file warning on stderr, and the run still exits 0. Symlinks are still not followed.
+
+The only v2 behavior changes in dupfind are the exit 3 output collision above, the read-only enumeration above, the deprecation notice on stderr, and the help layout (`Usage:` and `Example:` block).
 
 Unchanged: a root that is a symlink yields no files (`test_root_symlink_is_skipped`); symlinks inside the tree are skipped (`test_single_directory_detects_content_duplicates_and_skips_symlink`); compare mode reports only cross-directory matches (`test_compare_mode_reports_only_cross_directory_matches`); unreadable files produce warnings on stderr and exit 0.
 

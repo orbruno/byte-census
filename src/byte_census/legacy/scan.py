@@ -1,54 +1,67 @@
 """Directory scanning and duplicate detection for the legacy dupfind command."""
 
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
 
 from rich.progress import track
 
+from byte_census import fsread
 from byte_census.legacy.consoles import status_console
 from byte_census.legacy.hashing import calculate_hash
 
 
 def collect_files(path: Path, recursive: bool = True, min_size: int = 0) -> list[Path]:
+    """Collect regular files under path; see collect_files_with_errors."""
+    return collect_files_with_errors(path, recursive, min_size)[0]
+
+
+def _walk_items(path: Path, recursive: bool) -> Iterable[fsread.WalkItem]:
+    """Enumerate through fsread: no symlinks, no other devices, no dataless dirs."""
+    if recursive:
+        return fsread.walk(path)
+    return fsread.list_directory(path)
+
+
+def collect_files_with_errors(
+    path: Path, recursive: bool = True, min_size: int = 0
+) -> tuple[list[Path], list[str]]:
     """
-    Collect all files from a directory.
+    Collect regular files from a path and the enumeration problems seen.
+
+    Directories are listed only through fsread, so symlinks are never followed,
+    other volumes are not entered, and dataless directories are never listed.
+    Those and unreadable directories are returned as warning messages.
 
     Args:
-        path: Directory path to scan
+        path: Directory (or single file) path to scan
         recursive: Whether to search recursively
         min_size: Minimum file size in bytes to consider
 
     Returns:
-        List of file paths
+        Tuple of (sorted file paths, warning messages)
     """
-    files = []
-
     if not path.exists():
         raise FileNotFoundError(f"Path does not exist: {path}")
 
     if path.is_symlink():
-        return []
+        return [], []
 
     if path.is_file():
-        # Single file provided
-        if path.stat().st_size >= min_size:
-            return [path]
-        return []
+        return ([path] if path.stat().st_size >= min_size else []), []
 
-    # Directory scanning
-    pattern = "**/*" if recursive else "*"
-
-    for item in path.glob(pattern):
-        # Skip directories and symlinks
-        if item.is_file() and not item.is_symlink():
-            try:
-                if item.stat().st_size >= min_size:
-                    files.append(item)
-            except (OSError, PermissionError):
-                # Skip files we can't stat
-                continue
-
-    return sorted(files)
+    files: list[Path] = []
+    errors: list[str] = []
+    for item in _walk_items(path, recursive):
+        if isinstance(item, fsread.WalkError):
+            errors.append(f"Cannot list {item.path}: {item.reason}")
+        elif (
+            isinstance(item, fsread.WalkEntry)
+            and item.kind == "file"
+            and item.stat.st_size >= min_size
+        ):
+            files.append(Path(item.path))
+    return sorted(files), errors
 
 
 def group_files_by_size(files: list[Path]) -> tuple[dict[int, list[Path]], list[str]]:
@@ -102,12 +115,13 @@ def find_duplicates_single(
         duplicates_dict: {hash: [file_paths]} for files with duplicates
         errors_list: List of error messages for files that couldn't be processed
     """
-    files = collect_files(path, recursive, min_size)
+    files, walk_errors = collect_files_with_errors(path, recursive, min_size)
 
     if not files:
-        return {}, [], 0
+        return {}, walk_errors, 0
 
     size_groups, errors = group_files_by_size(files)
+    errors = walk_errors + errors
     candidates = _repeated_size_candidates(size_groups)
 
     file_iterator = (
@@ -182,11 +196,11 @@ def find_duplicates_compare(
         duplicates_dict: {hash: [all_matching_files]} (flattened from both dirs)
         errors_list: List of error messages
     """
-    files1 = collect_files(path1, recursive, min_size)
-    files2 = collect_files(path2, recursive, min_size)
+    files1, walk_errors1 = collect_files_with_errors(path1, recursive, min_size)
+    files2, walk_errors2 = collect_files_with_errors(path2, recursive, min_size)
     size_groups1, errors1 = group_files_by_size(files1)
     size_groups2, errors2 = group_files_by_size(files2)
-    errors = errors1 + errors2
+    errors = walk_errors1 + walk_errors2 + errors1 + errors2
 
     common_sizes = set(size_groups1) & set(size_groups2)
     candidates1 = _common_size_candidates(size_groups1, common_sizes)

@@ -64,7 +64,7 @@ Disposition: `retain` keeps the behavior; `change` keeps the purpose with a diff
 | P10 | Artifacts: regeneration commands `npm install`, `uv sync`, `cargo build` | retain | `details.regenerate_command` and the `artifact-remove-regenerate` suggestion. |
 | P11 | Artifacts: `projectModified` in epoch milliseconds | change | `details.project_mtime` in RFC 3339 UTC. |
 | P12 | Artifacts: default root `~/Documents` | change | `artifacts scan ROOT` takes the root as an argument; the caller passes its default. |
-| P13 | Duplicates: `dupfind ROOT --format json --output FILE --min-size 1048576 --quiet`, default root `~/Downloads` | change | `duplicates scan PATH --min-size N` on stdout; `dupfind` stays as the frozen adapter until WI-PREVIEW-CALLER. |
+| P13 | Duplicates: `dupfind ROOT --format json --output FILE --min-size 1048576 --quiet`, default root `~/Downloads` | change | `duplicates scan PATH --min-size N` on stdout; `dupfind` stays as the frozen adapter until WI-PREVIEW-CALLER; it no longer descends into other volumes or dataless directories. |
 | P14 | Folder tree: `du -k -d 4` on the first scan root, folders of at least 100 MiB, children sorted by size, `errors` = stderr line count | change | `data.tree` with depth 4 and minimum 100 MiB as defaults (Decision: flags `--tree-depth` and `--tree-min-mb`); built for every scan root; errors per path in `incomplete_coverage`. |
 | P15 | Collector run with `--top 40` and TSV parsing | change | Replaced by `disk map` JSON; the caller passes `--top 40` if it wants it. |
 | P16 | Per-step cost: seconds, status, error, and `total_s` | change | Per-command `meta.cost` (elapsed, bytes read, entries, subprocess counters) and `meta.status`; totals across commands belong to the caller. |

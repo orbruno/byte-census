@@ -39,6 +39,9 @@ All notable changes to this project are recorded here.
 
 ### Changed
 
+- `dupfind` enumerates directories through the safe reader: it no longer
+  descends into other volumes or dataless (evicted) directories, which are
+  reported as warnings on stderr (exit 0). Output for ordinary trees is unchanged.
 - The contract now states the two `duplicates scan` ordering rules separately: an inode's primary name is its shallowest name, then code-point order; copies in a group, the kept copy, the removal command, and the reclaimable estimate follow code-point order of primary names. Output is unchanged.
 - `dupfind --output FILE` now creates the file exclusively. An existing file or
   a symlink (dangling or not) at the path exits 3, writes nothing, and names the
