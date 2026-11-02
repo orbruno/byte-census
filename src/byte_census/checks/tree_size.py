@@ -25,13 +25,11 @@ class InodeLedger:
     seen: set[InodeKey] = field(default_factory=set)
     allocated_bytes: int = 0
 
-    def claim(self, key: InodeKey, allocated: int) -> bool:
-        """Record an inode; return False when an earlier claimant had it."""
-        if key in self.seen:
-            return False
-        self.seen.add(key)
-        self.allocated_bytes += allocated
-        return True
+    def claim(self, key: InodeKey, allocated: int) -> None:
+        """Record an inode once; later claimants add nothing."""
+        if key not in self.seen:
+            self.seen.add(key)
+            self.allocated_bytes += allocated
 
 
 @dataclass(frozen=True)
@@ -41,7 +39,8 @@ class TreeMeasurement:
     logical_bytes: int
     allocated_bytes: int
     entries_visited: int
-    hard_links_merged: bool
+    repeated: bool
+    linked: frozenset[InodeKey]
     coverage: tuple[CoverageEntry, ...]
     skipped_mounts: tuple[str, ...]
 
@@ -55,7 +54,8 @@ class _Tally:
         self.logical = 0
         self.allocated = 0
         self.entries = 0
-        self.merged = False
+        self.repeated = False
+        self.linked: set[InodeKey] = set()
         self.coverage: list[CoverageEntry] = []
         self.mounts: list[str] = []
 
@@ -63,14 +63,15 @@ class _Tally:
         key = (info.st_dev, info.st_ino)
         allocated = info.st_blocks * 512
         if key in self.local:
-            self.merged = True
+            self.repeated = True
             return
         self.local.add(key)
+        if info.st_nlink > 1:
+            self.linked.add(key)
         self.allocated += allocated
         if stat.S_ISREG(info.st_mode):
             self.logical += info.st_size
-        if not self.ledger.claim(key, allocated):
-            self.merged = True
+        self.ledger.claim(key, allocated)
 
     def add_item(self, item: fsread.WalkItem) -> None:
         if isinstance(item, fsread.WalkEntry):
@@ -90,7 +91,8 @@ class _Tally:
             logical_bytes=self.logical,
             allocated_bytes=self.allocated,
             entries_visited=self.entries,
-            hard_links_merged=self.merged,
+            repeated=self.repeated,
+            linked=frozenset(self.linked),
             coverage=tuple(self.coverage),
             skipped_mounts=tuple(self.mounts),
         )

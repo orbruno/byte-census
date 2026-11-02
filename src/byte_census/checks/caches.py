@@ -1,16 +1,18 @@
 """`caches scan`: the largest folders in ~/Library/Caches and the tool caches.
 
 Every immediate child folder of the Caches root is measured completely before
-the display is cut to `--top`. The uv, npm, and Homebrew caches are added when
-they lie outside the Caches root; a tool cache that is a child folder is
-reported once, as that folder, and carries the tool's name and suggestion.
-Everything here is metadata-only and read-only.
+the display is cut to `--top`. Measurement and tool association are separate:
+a tool cache outside the Caches root is measured as its own `tool_cache`
+finding; a tool cache equal to the root is measured as the whole root (the
+root-level files included); a tool cache inside a child folder is measured
+once, as that folder, which carries the tool's name and catalog suggestion.
+Several tools may share one finding. Everything here is metadata-only.
 """
 
 import errno
 import os
-import stat
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from byte_census import fsread
@@ -22,7 +24,12 @@ from byte_census.checks.tool_caches import (
     default_tool_runner,
     resolve_tool_caches,
 )
-from byte_census.checks.tree_size import InodeLedger, TreeMeasurement, measure_tree
+from byte_census.checks.tree_size import (
+    InodeKey,
+    InodeLedger,
+    TreeMeasurement,
+    measure_tree,
+)
 from byte_census.command import CheckResult
 from byte_census.cost import CostCounters
 from byte_census.model import (
@@ -71,8 +78,7 @@ class Candidate:
     kind: str
     target: str
     measurement: TreeMeasurement
-    tool: str | None
-    location_source: str
+    tools: tuple[ToolCache, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -108,28 +114,26 @@ def _open_root(path: str) -> tuple[str | None, UnavailableSource | None]:
 class _Children:
     """Mutable result of listing the Caches root."""
 
-    folders: list[tuple[str, int]] = field(default_factory=list)
+    folders: list[str] = field(default_factory=list)
     coverage: list[CoverageEntry] = field(default_factory=list)
+    mounts: list[str] = field(default_factory=list)
     other_entries: int = 0
 
 
 def _list_children(root: str) -> _Children:
+    """Sort the root's own entries into folders, mounts, gaps, and the rest."""
     found = _Children()
-    try:
-        with os.scandir(root) as iterator:
-            entries = sorted(iterator, key=lambda e: os.fsencode(e.name))
-    except OSError as error:
-        found.coverage.append(_coverage(root, error, "scandir"))
-        return found
-    for entry in entries:
-        try:
-            info = entry.stat(follow_symlinks=False)
-        except OSError as error:
-            found.coverage.append(_coverage(entry.path, error, "lstat"))
+    for item in fsread.list_directory(root):
+        if isinstance(item, fsread.WalkError):
+            found.coverage.append(
+                CoverageEntry(item.path, item.reason, item.errno_name, item.operation)
+            )
+            found.other_entries += 1 if item.operation == "lstat" else 0
+        elif isinstance(item, fsread.SkippedMount):
+            found.mounts.append(item.path)
             found.other_entries += 1
-            continue
-        if stat.S_ISDIR(info.st_mode):
-            found.folders.append((entry.path, info.st_dev))
+        elif item.kind == "directory":
+            found.folders.append(item.path)
         else:
             found.other_entries += 1
     return found
@@ -148,23 +152,47 @@ def _is_inside(path: str, root: str) -> bool:
     return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
 
 
-def _outside_tools(
-    tools: ToolResolution, root: str | None, children: set[str]
-) -> tuple[ToolCache, ...]:
-    """Tool caches outside the root, each location once, first tool wins."""
-    seen: set[str] = set()
-    kept: list[ToolCache] = []
-    for cache in tools.caches:
-        inside = root is not None and _is_inside(cache.path, root)
-        if inside or cache.path in seen or cache.path in children:
-            continue
-        seen.add(cache.path)
-        kept.append(cache)
-    return tuple(kept)
+def _host_of(path: str, units: Sequence[str]) -> str | None:
+    """The innermost measured unit that contains `path`, if any."""
+    inside = [unit for unit in units if _is_inside(path, unit)]
+    return max(inside, key=len) if inside else None
+
+
+def _tool_units(
+    tools: Sequence[ToolCache], root: str | None, folders: Sequence[str]
+) -> tuple[list[str], list[str]]:
+    """Return (units to measure for tools, all units known to host tools).
+
+    The root is a unit when a tool equals it. A tool outside the root becomes a
+    unit unless an already chosen unit contains it.
+    """
+    units = list(folders)
+    extra: list[str] = []
+    if root is not None and any(t.path == root for t in tools):
+        units.append(root)
+        extra.append(root)
+    for cache in sorted(tools, key=lambda t: (len(t.path), t.path)):
+        outside = root is None or not _is_inside(cache.path, root)
+        if outside and _host_of(cache.path, units) is None:
+            units.append(cache.path)
+            extra.append(cache.path)
+    return extra, units
+
+
+def _hosting(
+    tools: Sequence[ToolCache], units: Sequence[str]
+) -> dict[str, tuple[ToolCache, ...]]:
+    """Tools by host unit, in tool order; a tool without a host is dropped."""
+    hosted: dict[str, list[ToolCache]] = {}
+    for cache in tools:
+        host = _host_of(cache.path, units)
+        if host is not None:
+            hosted.setdefault(host, []).append(cache)
+    return {unit: tuple(found) for unit, found in hosted.items()}
 
 
 class _Collector:
-    """Mutable accumulator for one run; `gathered` freezes it."""
+    """Mutable accumulator for one run."""
 
     def __init__(self) -> None:
         self.ledger = InodeLedger()
@@ -174,52 +202,46 @@ class _Collector:
         self.mounts: list[str] = []
         self.entries = 0
 
-    def measure(self, kind: str, path: str, tool: ToolCache | None) -> None:
+    def measure(self, kind: str, path: str, tools: tuple[ToolCache, ...]) -> bool:
         measured, gap = _measure(path, self.ledger)
         if measured is None:
             self.entries += 1
             self.coverage.append(gap)
-            return
+            return False
         self.entries += measured.entries_visited
         self.coverage.extend(measured.coverage)
         self.mounts.extend(measured.skipped_mounts)
-        source = tool.location_source if tool else CHILD_SOURCE
-        name = tool.tool if tool else None
-        self.candidates.append(Candidate(kind, path, measured, name, source))
+        self.candidates.append(Candidate(kind, path, measured, tools))
+        return True
 
-    def measure_child(
-        self, path: str, dev: int, root_dev: int, tool: ToolCache | None
-    ) -> None:
-        if dev != root_dev:
-            self.mounts.append(path)
+    def measure_tool_unit(self, path: str, tools: tuple[ToolCache, ...]) -> None:
+        try:
+            device = fsread.lstat(path).st_dev
+        except OSError as error:
             self.entries += 1
+            self.coverage.append(_coverage(path, error, "lstat"))
             return
-        self.measure("cache_dir", path, tool)
-
-    def measure_tool(self, cache: ToolCache) -> None:
-        before = len(self.candidates)
-        self.measure("tool_cache", cache.path, cache)
-        if len(self.candidates) > before:
-            dev = fsread.lstat(cache.path).st_dev
-            self.roots.append(ScopeRoot(cache.path, cache.location_source, dev))
+        if self.measure("tool_cache", path, tools) and tools:
+            self.roots.append(ScopeRoot(path, tools[0].location_source, device))
 
 
 def _gather(env: CachesEnvironment, tools: ToolResolution) -> Gathered:
     root, missing = _open_root(env.caches_root)
-    listing = _children_of(root)
+    listing = _list_children(root) if root else _Children()
     col = _Collector()
     col.coverage.extend(listing.coverage)
+    col.mounts.extend(listing.mounts)
     col.entries += listing.other_entries
-    root_dev = fsread.lstat(root).st_dev if root else 0
     if root:
-        col.roots.append(ScopeRoot(root, ROOT_GIVEN, root_dev))
-    by_path = {c.path: c for c in reversed(tools.caches)}
-    for path, dev in listing.folders:
-        col.measure_child(path, dev, root_dev, by_path.get(path))
+        device = fsread.lstat(root).st_dev
+        col.roots.append(ScopeRoot(root, ROOT_GIVEN, device))
+    extra, units = _tool_units(tools.caches, root, listing.folders)
+    hosted = _hosting(tools.caches, units)
+    for path in listing.folders:
+        col.measure("cache_dir", path, hosted.get(path, ()))
     cache_dirs = len(col.candidates)
-    folders = {path for path, _ in listing.folders}
-    for cache in _outside_tools(tools, root, folders):
-        col.measure_tool(cache)
+    for path in extra:
+        col.measure_tool_unit(path, hosted.get(path, ()))
     return Gathered(
         candidates=tuple(col.candidates),
         roots=tuple(col.roots),
@@ -233,18 +255,37 @@ def _gather(env: CachesEnvironment, tools: ToolResolution) -> Gathered:
     )
 
 
-def _children_of(root: str | None) -> _Children:
-    return _list_children(root) if root else _Children()
+def _shared_links(candidates: Sequence[Candidate]) -> frozenset[InodeKey]:
+    """Multi-name inodes seen by more than one finding, whatever the order."""
+    seen = Counter(key for c in candidates for key in c.measurement.linked)
+    return frozenset(key for key, count in seen.items() if count > 1)
 
 
-def _finding(candidate: Candidate) -> Finding:
+def _details(candidate: Candidate) -> dict[str, object]:
+    tools = candidate.tools
+    if not tools:
+        return {"tool": None, "location_source": CHILD_SOURCE}
+    details: dict[str, object] = {
+        "tool": tools[0].tool,
+        "location_source": tools[0].location_source,
+    }
+    if len(tools) > 1:
+        details["other_tools"] = [
+            {"tool": t.tool, "location_source": t.location_source} for t in tools[1:]
+        ]
+    if any(t.path != candidate.target for t in tools):
+        details["tool_locations"] = [t.path for t in tools]
+    uncertain = [t.uncertain for t in tools if t.uncertain]
+    if uncertain:
+        details["location_uncertain"] = "; ".join(uncertain)
+    return details
+
+
+def _finding(candidate: Candidate, shared: frozenset[InodeKey]) -> Finding:
     measured = candidate.measurement
-    caveats = (
-        (CAVEAT_CLONES, CAVEAT_LINKS)
-        if measured.hard_links_merged
-        else (CAVEAT_CLONES,)
-    )
-    tool = candidate.tool
+    merged = measured.repeated or bool(measured.linked & shared)
+    caveats = (CAVEAT_CLONES, CAVEAT_LINKS) if merged else (CAVEAT_CLONES,)
+    tools = candidate.tools
     return Finding(
         id=finding_id("cch", candidate.kind, candidate.target),
         kind=candidate.kind,
@@ -253,9 +294,9 @@ def _finding(candidate: Candidate) -> Finding:
         allocated_bytes=measured.allocated_bytes,
         reclaimable_estimate_bytes=measured.allocated_bytes,
         caveats=caveats,
-        suggestion_ids=(SUGGESTION_IDS[tool],) if tool else (),
-        classification=Classification(owner=tool or ""),
-        details={"tool": tool, "location_source": candidate.location_source},
+        suggestion_ids=tuple(SUGGESTION_IDS[t.tool] for t in tools),
+        classification=Classification(owner=tools[0].tool if tools else ""),
+        details=_details(candidate),
     )
 
 
@@ -273,7 +314,8 @@ def caches_scan(env: CachesEnvironment, top: int) -> CheckResult:
     npm_environ = {**env.environ, "HOME": env.home}
     tools = resolve_tool_caches(npm_environ, env.run_tool)
     gathered = _gather(env, tools)
-    ordered = order_findings_by_size(_finding(c) for c in gathered.candidates)
+    shared = _shared_links(gathered.candidates)
+    ordered = order_findings_by_size(_finding(c, shared) for c in gathered.candidates)
     shown = ordered[:top]
     summary = {
         "cache_dir_count": gathered.cache_dirs,
@@ -294,6 +336,6 @@ def caches_scan(env: CachesEnvironment, top: int) -> CheckResult:
             skipped_mounts=gathered.mounts,
         ),
         counters=counters,
-        incomplete_coverage=gathered.coverage,
+        incomplete_coverage=tools.coverage + gathered.coverage,
         unavailable_sources=tools.unavailable + gathered.unavailable,
     )

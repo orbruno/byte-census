@@ -278,3 +278,35 @@ def walk(root: StrPath) -> Iterator[WalkItem]:
         yield from items
         if children is not None:
             stack.append(children)
+
+
+def _list_item(path: str, root_dev: int) -> WalkItem:
+    """Classify one listed entry; a foreign-device directory is a mount."""
+    try:
+        info = lstat(path)
+    except OSError as error:
+        return _walk_error(path, "lstat", error)
+    if stat.S_ISDIR(info.st_mode) and info.st_dev != root_dev:
+        return SkippedMount(path)
+    return WalkEntry(path, info)
+
+
+def list_directory(path: StrPath, root_dev: int | None = None) -> list[WalkItem]:
+    """List one directory's own entries in byte order of names; never descend.
+
+    The directory is examined with `lstat` first. A dataless directory is
+    never listed: the result is a single WalkError with reason `dataless`, as
+    in `walk`. An unreadable directory gives one WalkError. Symlinks are not
+    followed. A child directory whose `st_dev` differs from `root_dev` (the
+    listed directory's own device by default) is a SkippedMount.
+    """
+    dir_path = os.fspath(path)
+    try:
+        info = lstat(dir_path)
+    except OSError as error:
+        return [_walk_error(dir_path, "lstat", error)]
+    errors, entries = _open_dir(dir_path, info)
+    if entries is None:
+        return errors
+    device = info.st_dev if root_dev is None else root_dev
+    return [_list_item(entry.path, device) for entry in entries]

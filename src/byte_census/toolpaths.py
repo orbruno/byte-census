@@ -11,12 +11,14 @@ through to the next source. Nothing is created, and normalization does not
 touch the filesystem.
 """
 
+import errno
 import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from byte_census.fsread import FsReadError, read_small_file
+from byte_census.fsread import FsReadError, coverage_reason, read_small_file
+from byte_census.model import CoverageEntry
 
 NPMRC_MAX_BYTES = 1024 * 1024
 NPM_CACHE_KEY = "npm_config_cache"
@@ -30,6 +32,7 @@ class ToolPath:
     path: str | None
     source: str
     note: str | None
+    coverage: CoverageEntry | None = None
 
 
 def expand_cache_value(value: str, home: str | None) -> str | None:
@@ -79,18 +82,24 @@ def parse_npmrc_cache(text: str) -> str | None:
     return found
 
 
-def _npmrc_value(home: str) -> tuple[str, str | None, str | None]:
-    """Return (npmrc path, cache value or None, note or None)."""
+def _npmrc_value(
+    home: str,
+) -> tuple[str, str | None, str | None, CoverageEntry | None]:
+    """Return (npmrc path, cache value, note, coverage gap) for $HOME/.npmrc."""
     rc_path = os.path.join(home, ".npmrc")
     try:
         data = read_small_file(os.path.realpath(rc_path), NPMRC_MAX_BYTES)
     except FileNotFoundError:
-        return rc_path, None, None
+        return rc_path, None, None, None
     except FsReadError as error:
-        return rc_path, None, f"npmrc_unreadable: {error.reason}"
+        gap = CoverageEntry(rc_path, error.reason, None, "read")
+        return rc_path, None, f"npmrc_unreadable: {error.reason}", gap
     except OSError as error:
-        return rc_path, None, f"npmrc_unreadable: {error.strerror}"
-    return rc_path, parse_npmrc_cache(data.decode("utf-8", errors="replace")), None
+        name = errno.errorcode.get(error.errno) if error.errno is not None else None
+        gap = CoverageEntry(rc_path, coverage_reason(error.errno), name, "read")
+        return rc_path, None, f"npmrc_unreadable: {error.strerror}", gap
+    text = data.decode("utf-8", errors="replace")
+    return rc_path, parse_npmrc_cache(text), None, None
 
 
 def npm_cache_location(environ: Mapping[str, str]) -> ToolPath:
@@ -107,11 +116,11 @@ def npm_cache_location(environ: Mapping[str, str]) -> ToolPath:
     if home is None or not os.path.isabs(home):
         reason = "HOME is not set" if home is None else "HOME is not absolute"
         return ToolPath(None, "unresolved", _joined([*notes, reason]))
-    rc_path, value, note = _npmrc_value(home)
+    rc_path, value, note, gap = _npmrc_value(home)
     notes.extend([note] if note else [])
     if value is not None:
         path = expand_cache_value(value, home)
         if path is not None:
-            return ToolPath(path, f"npmrc:{rc_path}", _joined(notes))
+            return ToolPath(path, f"npmrc:{rc_path}", _joined(notes), gap)
         notes.append(f"cache_not_absolute: npmrc:{rc_path} {value!r}")
-    return ToolPath(os.path.join(home, ".npm"), "default", _joined(notes))
+    return ToolPath(os.path.join(home, ".npm"), "default", _joined(notes), gap)

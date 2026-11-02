@@ -9,6 +9,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -224,29 +225,144 @@ def test_brew_cache_inside_caches_is_reported_once_with_its_tool(
     assert str(world.caches / "Homebrew") not in roots
 
 
-def test_tool_location_nested_inside_a_cache_folder_is_counted_once(
+def finding_for(payload: dict[str, Any], target: Path) -> dict[str, Any]:
+    return by_target(payload)[str(target)]
+
+
+def suggestions_of(payload: dict[str, Any]) -> dict[str, list[str]]:
+    return {s["id"]: s["finding_ids"] for s in payload["data"]["suggestions"]}
+
+
+def test_tool_location_nested_inside_a_cache_folder_keeps_its_association(
     monkeypatch: pytest.MonkeyPatch, world: World
 ) -> None:
     populate(world)
+    _, before = scan(monkeypatch, world)
     world.tools.brew = str(world.caches / "medium" / "sub")
     _, payload = scan(monkeypatch, world)
 
+    medium = finding_for(payload, world.caches / "medium")
+    assert medium["kind"] == "cache_dir"
+    assert medium["suggestion_ids"] == ["brew-cleanup"]
+    assert medium["details"]["tool"] == "brew"
+    assert medium["details"]["tool_locations"] == [str(world.caches / "medium" / "sub")]
+    assert suggestions_of(payload)["brew-cleanup"] == [medium["id"]]
     assert payload["data"]["summary"]["tool_cache_count"] == 1
-    assert [f["details"]["tool"] for f in payload["data"]["findings"]].count(
-        "brew"
-    ) == 0
+    assert (
+        payload["data"]["summary"]["total_allocated_bytes"]
+        == before["data"]["summary"]["total_allocated_bytes"]
+    )
 
 
-def test_two_tools_at_one_location_are_counted_once(
+def test_tool_cache_equal_to_the_caches_root_includes_root_level_files(
     monkeypatch: pytest.MonkeyPatch, world: World
 ) -> None:
     populate(world)
-    world.environ["npm_config_cache"] = str(world.home / ".cache" / "uv")
+    world.tools.brew = str(world.caches)
     _, payload = scan(monkeypatch, world)
 
-    tools = [f["details"]["tool"] for f in payload["data"]["findings"]]
-    assert tools.count("uv") == 1
-    assert tools.count("npm") == 0
+    root = finding_for(payload, world.caches)
+    assert root["kind"] == "tool_cache"
+    assert root["details"]["tool"] == "brew"
+    assert root["logical_bytes"] >= 50_000 + 300_000 + 100_000 + 10_000 + 200_000
+    expected = tree_allocated(world.caches) + allocated_bytes_of(world.caches)
+    assert root["allocated_bytes"] == expected
+    uv_dir = world.home / ".cache" / "uv"
+    uv_bytes = tree_allocated(uv_dir) + allocated_bytes_of(uv_dir)
+    assert payload["data"]["summary"]["total_allocated_bytes"] == expected + uv_bytes
+    assert suggestions_of(payload)["brew-cleanup"] == [root["id"]]
+
+
+def test_two_tools_at_one_location_each_keep_association_and_suggestion(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    populate(world)
+    uv_dir = world.home / ".cache" / "uv"
+    world.environ["npm_config_cache"] = str(uv_dir)
+    _, payload = scan(monkeypatch, world)
+
+    found = finding_for(payload, uv_dir)
+    assert found["kind"] == "tool_cache"
+    assert found["suggestion_ids"] == ["npm-cache-verify", "uv-cache-prune"]
+    assert found["details"]["tool"] == "uv"
+    assert [t["tool"] for t in found["details"]["other_tools"]] == ["npm"]
+    suggestions = suggestions_of(payload)
+    assert suggestions["npm-cache-verify"] == [found["id"]]
+    assert suggestions["uv-cache-prune"] == [found["id"]]
+    assert payload["data"]["summary"]["tool_cache_count"] == 1
+
+
+def test_tool_nested_inside_another_tool_cache_is_associated_not_remeasured(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    populate(world)
+    nested = world.home / ".cache" / "uv" / "npm-inside"
+    make_file(nested / "n.bin", 1000)
+    world.environ["npm_config_cache"] = str(nested)
+    _, payload = scan(monkeypatch, world)
+
+    assert str(nested) not in by_target(payload)
+    uv = finding_for(payload, world.home / ".cache" / "uv")
+    assert uv["suggestion_ids"] == ["npm-cache-verify", "uv-cache-prune"]
+    assert payload["data"]["summary"]["tool_cache_count"] == 1
+
+
+def test_tool_location_that_vanishes_is_a_coverage_gap_not_a_crash(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    populate(world)
+    uv_dir = str(world.home / ".cache" / "uv")
+    real = caches.fsread.lstat
+    calls: list[str] = []
+
+    def vanishing(path: Any) -> Any:
+        if os.fspath(path) == uv_dir:
+            calls.append(uv_dir)
+            if len(calls) >= 3:
+                raise FileNotFoundError(2, "gone", uv_dir)
+        return real(path)
+
+    monkeypatch.setattr(caches.fsread, "lstat", vanishing)
+    result, payload = scan(monkeypatch, world)
+
+    assert result.exit_code == 0, result.stderr
+    assert uv_dir not in by_target(payload)
+    gaps = [g for g in payload["meta"]["incomplete_coverage"] if g["path"] == uv_dir]
+    assert gaps and gaps[0]["reason"] == "vanished"
+    assert payload["meta"]["status"] == "partial"
+
+
+@pytest.mark.parametrize("which", ["root", "data_volume", "home"])
+def test_dangerous_tool_locations_are_rejected_and_not_walked(
+    monkeypatch: pytest.MonkeyPatch, world: World, which: str
+) -> None:
+    populate(world)
+    location = {
+        "root": "/",
+        "data_volume": "/System/Volumes/Data",
+        "home": str(world.home),
+    }[which]
+    world.environ["npm_config_cache"] = location
+    walked: list[str] = []
+    real_walk = caches.fsread.walk
+    real_measure = caches.measure_tree
+
+    def spy(root: str, ledger: Any) -> Any:
+        walked.append(root)
+        if root == location:
+            raise AssertionError(f"walked a forbidden location: {root}")
+        return real_measure(root, ledger)
+
+    monkeypatch.setattr(caches, "measure_tree", spy)
+    result, payload = scan(monkeypatch, world)
+
+    assert real_walk is not None
+    assert result.exit_code == 0
+    assert location not in walked
+    npm = [u for u in payload["meta"]["unavailable_sources"] if u["source"] == "npm"]
+    assert npm[0]["reason"] == "failed"
+    assert "refus" in npm[0]["detail"]
+    assert payload["meta"]["status"] == "partial"
 
 
 def test_uv_cache_outside_caches_is_a_tool_cache(
@@ -421,8 +537,9 @@ def test_hard_link_between_folders_is_counted_once_in_the_total(
     assert payload["data"]["summary"]["total_allocated_bytes"] == (
         one["allocated_bytes"] + two["allocated_bytes"] - allocated_bytes_of(original)
     )
-    assert two["caveats"] == ["apfs_clone_or_shared_extent", "hard_links_merged"]
-    assert one["caveats"] == ["apfs_clone_or_shared_extent"]
+    both = ["apfs_clone_or_shared_extent", "hard_links_merged"]
+    assert two["caveats"] == both
+    assert one["caveats"] == both
 
 
 def test_unreadable_folder_is_a_coverage_gap_not_a_failure(
@@ -590,3 +707,99 @@ def test_output_is_deterministic(monkeypatch: pytest.MonkeyPatch, world: World) 
         payload["meta"]["captured_at"] = payload["meta"]["cost"]["elapsed_s"] = None
 
     assert a == b
+
+
+def test_dataless_caches_root_is_never_listed(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    make_file(world.caches / "app" / "f.bin", 1000)
+    root = str(world.caches)
+    real = caches.fsread.lstat
+
+    def dataless(path: Any) -> Any:
+        info = real(path)
+        if os.fspath(path) != root:
+            return info
+        fields = {n: getattr(info, n) for n in dir(info) if n.startswith("st_")}
+        return SimpleNamespace(**{**fields, "st_flags": 0x40000000})
+
+    def forbidden(path: Any) -> Any:
+        raise AssertionError(f"scandir called on {path}")
+
+    monkeypatch.setattr(caches.fsread, "lstat", dataless)
+    monkeypatch.setattr(caches.fsread.os, "scandir", forbidden)
+    result, payload = scan(monkeypatch, world)
+
+    assert result.exit_code == 0, result.stderr
+    assert payload["data"]["findings"] == []
+    assert payload["meta"]["status"] == "partial"
+    assert payload["meta"]["incomplete_coverage"] == [
+        {"path": root, "reason": "dataless", "errno": None, "operation": "scandir"}
+    ]
+
+
+def test_foreign_device_child_of_caches_is_a_skipped_mount(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    make_file(world.caches / "app" / "f.bin", 1000)
+    make_file(world.caches / "mnt" / "g.bin", 1000)
+    mount = str(world.caches / "mnt")
+    real = caches.fsread.lstat
+
+    def foreign(path: Any) -> Any:
+        info = real(path)
+        if os.fspath(path) != mount:
+            return info
+        fields = {n: getattr(info, n) for n in dir(info) if n.startswith("st_")}
+        return SimpleNamespace(**{**fields, "st_dev": info.st_dev + 1})
+
+    monkeypatch.setattr(caches.fsread, "lstat", foreign)
+    _, payload = scan(monkeypatch, world)
+
+    assert payload["meta"]["scope"]["skipped_mounts"] == [mount]
+    assert mount not in by_target(payload)
+
+
+def test_unreadable_npmrc_marks_the_npm_location_uncertain(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    populate(world)
+    make_file(world.home / ".npm" / "n.bin", 5000)
+    os.mkfifo(world.home / ".npmrc")
+    result, payload = scan(monkeypatch, world)
+
+    assert result.exit_code == 0
+    rc = str(world.home / ".npmrc")
+    assert payload["meta"]["incomplete_coverage"] == [
+        {"path": rc, "reason": "not_regular_file", "errno": None, "operation": "read"}
+    ]
+    assert payload["meta"]["status"] == "partial"
+    npm = finding_for(payload, world.home / ".npm")
+    assert rc in npm["details"]["location_uncertain"]
+    assert "not_regular_file" in npm["details"]["location_uncertain"]
+
+
+def test_unreadable_npmrc_is_reported_even_when_the_default_is_missing(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    populate(world)
+    os.mkfifo(world.home / ".npmrc")
+    _, payload = scan(monkeypatch, world)
+
+    assert payload["meta"]["status"] == "partial"
+    assert payload["meta"]["incomplete_coverage"][0]["path"] == str(
+        world.home / ".npmrc"
+    )
+
+
+def test_hard_link_caveat_does_not_depend_on_measurement_order(
+    monkeypatch: pytest.MonkeyPatch, world: World
+) -> None:
+    original = make_file(world.caches / "zz" / "shared.bin", 5000)
+    (world.caches / "aa").mkdir()
+    os.link(original, world.caches / "aa" / "alias.bin")
+    _, payload = scan(monkeypatch, world)
+
+    for name in ("aa", "zz"):
+        found = finding_for(payload, world.caches / name)
+        assert "hard_links_merged" in found["caveats"]

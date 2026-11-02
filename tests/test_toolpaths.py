@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from byte_census import toolpaths
+from byte_census.model import CoverageEntry
 from byte_census.toolpaths import ToolPath, npm_cache_location
 
 
@@ -230,3 +231,43 @@ def test_relative_home_is_unresolved() -> None:
     assert npm_cache_location({"HOME": "relative/home"}) == ToolPath(
         None, "unresolved", "HOME is not absolute"
     )
+
+
+def test_unreadable_npmrc_exposes_a_coverage_entry(tmp_path: Path) -> None:
+    os.mkfifo(tmp_path / ".npmrc")
+
+    result = npm_cache_location({"HOME": str(tmp_path)})
+
+    assert result.coverage == CoverageEntry(
+        str(tmp_path / ".npmrc"), "not_regular_file", None, "read"
+    )
+
+
+def test_oversized_npmrc_exposes_a_coverage_entry(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(toolpaths, "NPMRC_MAX_BYTES", 8)
+    write_npmrc(tmp_path, "cache=/too/long/for/the/limit\n")
+
+    result = npm_cache_location({"HOME": str(tmp_path)})
+
+    assert result.coverage.reason == "too_large"
+
+
+def test_permission_denied_npmrc_exposes_errno(tmp_path: Path) -> None:
+    rc = write_npmrc(tmp_path, "cache=/x\n")
+    rc.chmod(0)
+    try:
+        result = npm_cache_location({"HOME": str(tmp_path)})
+    finally:
+        rc.chmod(0o644)
+
+    assert result.coverage == CoverageEntry(
+        str(rc), "permission_denied", "EACCES", "read"
+    )
+
+
+def test_readable_or_missing_npmrc_has_no_coverage_entry(tmp_path: Path) -> None:
+    assert npm_cache_location({"HOME": str(tmp_path)}).coverage is None
+    write_npmrc(tmp_path, "cache=/x\n")
+    assert npm_cache_location({"HOME": str(tmp_path)}).coverage is None

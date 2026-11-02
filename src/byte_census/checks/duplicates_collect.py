@@ -8,8 +8,6 @@ when they would otherwise be candidates they are listed in
 `incomplete_coverage`.
 """
 
-import errno
-import os
 import stat
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
@@ -61,26 +59,9 @@ class Collection:
     skipped_mounts: tuple[str, ...]
 
 
-def _walk_error(path: str, operation: str, error: OSError) -> fsread.WalkError:
-    code = error.errno
-    name = errno.errorcode.get(code) if code is not None else None
-    return fsread.WalkError(path, operation, fsread.coverage_reason(code), name)
-
-
 def _top_level(root: str) -> Iterator[fsread.WalkItem]:
     """List root's own entries in byte order of names, without descending."""
-    try:
-        with os.scandir(root) as iterator:
-            names = sorted((entry.name for entry in iterator), key=os.fsencode)
-    except OSError as error:
-        yield _walk_error(root, "scandir", error)
-        return
-    for name in names:
-        path = os.path.join(root, name)
-        try:
-            yield fsread.WalkEntry(path, fsread.lstat(path))
-        except OSError as error:
-            yield _walk_error(path, "lstat", error)
+    yield from fsread.list_directory(root)
 
 
 def _items(root: str, recursive: bool) -> Iterator[fsread.WalkItem]:

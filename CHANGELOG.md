@@ -16,6 +16,15 @@ All notable changes to this project are recorded here.
 
 ### Fixed
 
+- `caches scan` and `duplicates scan --no-recursive` list a root through one shared
+  helper (`fsread.list_directory`): a dataless root is never listed (partial,
+  exit 0) and a foreign-device child is a skipped mount.
+- `caches scan` keeps the tool name and catalog suggestion of a tool cache that
+  lies inside a cache folder, is the Caches root, or shares a location with
+  another tool; an unreadable `~/.npmrc` is reported in `incomplete_coverage`
+  and marks the npm location uncertain; the `hard_links_merged` caveat no longer
+  depends on measurement order; a tool cache that vanishes is a coverage gap;
+  a tool cache location of `/`, the data volume, or the home directory is refused.
 - `dupfind` hashes through the safe reader: dataless (evicted) files are not
   downloaded, FIFOs and other special files do not hang the scan, and a file
   swapped for a symlink is not followed. Each becomes a per-file warning on

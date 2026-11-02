@@ -387,7 +387,7 @@ def test_no_recursive_root_listing_error(
     def failing(path: Any) -> Any:
         raise PermissionError(1, "not permitted", os.fspath(path))
 
-    monkeypatch.setattr(duplicates_scan_module().os, "scandir", failing)
+    monkeypatch.setattr(fsread.os, "scandir", failing)
     payload = scan(str(tree), "--no-recursive")
 
     assert payload["meta"]["incomplete_coverage"] == [
@@ -398,12 +398,6 @@ def test_no_recursive_root_listing_error(
             "operation": "scandir",
         }
     ]
-
-
-def duplicates_scan_module() -> Any:
-    from byte_census.checks import duplicates_collect
-
-    return duplicates_collect
 
 
 def test_compare_reports_only_groups_spanning_both_roots(tmp_path: Path) -> None:
@@ -709,3 +703,56 @@ def test_help_starts_with_usage_and_has_example(command: list[str], flag: str) -
 
 def test_duplicates_is_listed_in_group_help() -> None:
     assert "duplicates" in invoke(["--help"]).stdout
+
+
+def fake_fields(info: os.stat_result, **overrides: Any) -> Any:
+    from types import SimpleNamespace
+
+    fields = {n: getattr(info, n) for n in dir(info) if n.startswith("st_")}
+    return SimpleNamespace(**{**fields, **overrides})
+
+
+def test_no_recursive_never_lists_a_dataless_root(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = str(tree.resolve())
+    real = fsread.lstat
+    monkeypatch.setattr(
+        fsread,
+        "lstat",
+        lambda p: (
+            fake_fields(real(p), st_flags=fsread.SF_DATALESS)
+            if os.fspath(p) == root
+            else real(p)
+        ),
+    )
+
+    def forbidden(path: Any) -> Any:
+        raise AssertionError(f"scandir called on {path}")
+
+    monkeypatch.setattr(fsread.os, "scandir", forbidden)
+    payload = scan(str(tree), "--no-recursive")
+
+    assert payload["meta"]["status"] == "partial"
+    assert payload["meta"]["incomplete_coverage"] == [
+        {"path": root, "reason": "dataless", "errno": None, "operation": "scandir"}
+    ]
+
+
+def test_no_recursive_reports_foreign_device_children_as_skipped_mounts(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mount = str(tree.resolve() / "sub")
+    real = fsread.lstat
+    monkeypatch.setattr(
+        fsread,
+        "lstat",
+        lambda p: (
+            fake_fields(real(p), st_dev=real(p).st_dev + 1)
+            if os.fspath(p) == mount
+            else real(p)
+        ),
+    )
+    payload = scan(str(tree), "--no-recursive")
+
+    assert payload["meta"]["scope"]["skipped_mounts"] == [mount]

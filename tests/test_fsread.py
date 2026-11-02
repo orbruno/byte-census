@@ -471,3 +471,109 @@ def test_walk_handles_trees_deeper_than_the_recursion_limit(tmp_path: Path) -> N
 
 def test_walk_has_no_recursive_helper() -> None:
     assert not hasattr(fsread, "_visit")
+
+
+# list_directory: one shared single-directory listing for the alternate traversals.
+
+
+def test_list_directory_lists_sorted_entries_without_descending(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "b").mkdir()
+    (tmp_path / "b" / "deep.txt").write_text("x")
+    (tmp_path / "a.txt").write_text("a")
+    (tmp_path / "link").symlink_to(tmp_path / "b")
+
+    items = fsread.list_directory(tmp_path)
+
+    assert [i.path for i in items] == [
+        str(tmp_path / n) for n in ("a.txt", "b", "link")
+    ]
+    assert all(isinstance(i, WalkEntry) for i in items)
+    assert items[2].kind == "symlink"
+
+
+def test_list_directory_reports_foreign_device_children_as_skipped_mounts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "mnt").mkdir()
+    (tmp_path / "plain").mkdir()
+    real = fsread.lstat
+
+    def fake(path: Any) -> Any:
+        info = real(path)
+        if os.fspath(path).endswith("mnt"):
+            return fake_stat(info, st_dev=info.st_dev + 1)
+        return info
+
+    monkeypatch.setattr(fsread, "lstat", fake)
+
+    items = fsread.list_directory(tmp_path)
+
+    assert items[0] == SkippedMount(str(tmp_path / "mnt"))
+    assert isinstance(items[1], WalkEntry)
+
+
+def test_list_directory_honours_an_explicit_root_device(tmp_path: Path) -> None:
+    (tmp_path / "sub").mkdir()
+    other = lstat(tmp_path).st_dev + 1
+
+    assert fsread.list_directory(tmp_path, other) == [
+        SkippedMount(str(tmp_path / "sub"))
+    ]
+
+
+def test_list_directory_never_lists_a_dataless_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    real = fsread.lstat
+    monkeypatch.setattr(
+        fsread, "lstat", lambda p: fake_stat(real(p), st_flags=SF_DATALESS)
+    )
+
+    def forbidden(path: Any) -> Any:
+        raise AssertionError(f"scandir called on {path}")
+
+    monkeypatch.setattr(fsread.os, "scandir", forbidden)
+
+    assert fsread.list_directory(tmp_path) == [
+        WalkError(str(tmp_path), "scandir", "dataless", None)
+    ]
+
+
+def test_list_directory_reports_a_missing_directory(tmp_path: Path) -> None:
+    gone = str(tmp_path / "gone")
+
+    assert fsread.list_directory(gone) == [
+        WalkError(gone, "lstat", "vanished", "ENOENT")
+    ]
+
+
+def test_list_directory_reports_an_unreadable_directory(tmp_path: Path) -> None:
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0)
+    try:
+        items = fsread.list_directory(locked)
+    finally:
+        locked.chmod(0o755)
+
+    assert items == [WalkError(str(locked), "scandir", "permission_denied", "EACCES")]
+
+
+def test_list_directory_reports_an_entry_that_cannot_be_examined(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "bad").write_text("x")
+    real = fsread.lstat
+
+    def fake(path: Any) -> Any:
+        if os.fspath(path).endswith("bad"):
+            raise PermissionError(errno.EACCES, "denied", os.fspath(path))
+        return real(path)
+
+    monkeypatch.setattr(fsread, "lstat", fake)
+
+    assert fsread.list_directory(tmp_path) == [
+        WalkError(str(tmp_path / "bad"), "lstat", "permission_denied", "EACCES")
+    ]
