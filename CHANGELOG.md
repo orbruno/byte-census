@@ -19,6 +19,24 @@ All notable changes to this project are recorded here.
   only with `BYTE_CENSUS_UPDATE_SNAPSHOTS=1`.
 - Coverage gate: `uv run pytest` fails below 80 percent line coverage.
 - GitHub Actions workflow running ruff and the full suite on `macos-latest`.
+- `byte_census.runner`, the only process gateway. It runs an argv only when
+  it exactly matches a row of `docs/contracts/argv-allowlist.md`, with
+  `shell=False`, a per-row timeout, stdin closed, and `LC_ALL=C`; it raises
+  typed errors for rejected argv, missing executables, and timeouts.
+- `byte_census.fsread`, read-only filesystem primitives: content reads
+  `lstat`, require a regular file, open with
+  `O_RDONLY | O_NOFOLLOW | O_NONBLOCK`, and re-check identity with `fstat`.
+  FIFOs, devices, sockets, symlinks, and dataless (`SF_DATALESS`) files are
+  never read. The walker never follows symlinks and never crosses an
+  `st_dev` change.
+- `byte_census.paths.validate_root`, which rejects empty paths, null bytes,
+  control characters, missing paths, and non-directories.
+- AST read-only guard test: process access only in the runner, write
+  operations only in `legacy/report_writer.py`, and `ctypes`, `pty`,
+  `tempfile`, `multiprocessing`, `os.fork`, `os.posix_spawn`, and dynamic
+  `getattr(os, ...)` forbidden everywhere.
+- Test that hashing and walking a fixture tree leave contents and
+  modification times unchanged; reading may update access times.
 
 ## 2.0.0
 
