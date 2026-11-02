@@ -352,16 +352,16 @@ def test_unparseable_image_line_is_recorded(monkeypatch: pytest.MonkeyPatch) -> 
     assert payload["data"]["images"] == []
 
 
-def test_unknown_type_and_unparseable_sizes_are_kept_raw(
+def test_unknown_type_is_kept_and_listed_after_known_types(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     line = json.dumps(
         {
             "Type": "Mystery",
-            "TotalCount": "x",
+            "TotalCount": "3",
             "Active": "1",
-            "Size": "?",
-            "Reclaimable": "?",
+            "Size": "1MB",
+            "Reclaimable": "0B",
         }
     )
     table = responses(df=ok(DF, [*df_lines(), line]))
@@ -370,9 +370,189 @@ def test_unknown_type_and_unparseable_sizes_are_kept_raw(
 
     mystery = payload["data"]["findings"][-1]
     assert mystery["target"] == "docker:Mystery"
-    assert mystery["details"]["docker_reported_size_bytes"] is None
-    assert mystery["details"]["total_count"] is None
     assert mystery["suggestion_ids"] == []
+    assert payload["meta"]["status"] == "complete"
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [[], ["{}"], ['{"Type": "Images"}'], ['{"Size": "1MB", "Reclaimable": "0B"}']],
+    ids=["empty", "empty-object", "missing-fields", "missing-type"],
+)
+def test_unusable_df_output_exits_4(
+    monkeypatch: pytest.MonkeyPatch, lines: list[str]
+) -> None:
+    result = invoke(monkeypatch, responses(df=ok(DF, lines)))
+
+    error = error_object(result)
+    assert result.exit_code == 4
+    assert error["error"] == "docker scan could not read Docker disk usage"
+    assert "unusable" in error["reason"]
+
+
+def test_df_rows_missing_fields_are_dropped_and_partial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    table = responses(df=ok(DF, [*df_lines(), '{"Type": "Mystery"}']))
+
+    payload = json.loads(invoke(monkeypatch, table).output)
+
+    assert len(payload["data"]["findings"]) == 4
+    assert payload["meta"]["status"] == "partial"
+    source = payload["meta"]["unavailable_sources"][0]
+    assert source["source"] == "docker system df"
+    assert "Mystery" in source["detail"]
+    assert "TotalCount" in source["detail"]
+
+
+def test_unparseable_numbers_are_null_raw_kept_and_totals_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bad_row = json.dumps(
+        {
+            "Type": "Images",
+            "TotalCount": "x",
+            "Active": "1",
+            "Size": "?",
+            "Reclaimable": "?",
+        }
+    )
+    others = [line for line in df_lines() if '"Images"' not in line]
+    table = responses(df=ok(DF, [bad_row, *others]))
+
+    payload = json.loads(invoke(monkeypatch, table).output)
+
+    details = payload["data"]["findings"][0]["details"]
+    assert details["total_count"] is None
+    assert details["docker_reported_size_bytes"] is None
+    assert details["raw"] == {"Size": "?", "Reclaimable": "?"}
+    summary = payload["data"]["summary"]
+    assert summary["docker_reported_size_bytes"] is None
+    assert summary["docker_reported_reclaimable_bytes"] is None
+    assert payload["meta"]["status"] == "partial"
+    detail = payload["meta"]["unavailable_sources"][0]["detail"]
+    assert "Images" in detail
+    assert "Size" in detail
+    assert "TotalCount" in detail
+
+
+@pytest.mark.parametrize(
+    ("key", "argv", "lines"),
+    [
+        ("images", IMAGES, ["{}"]),
+        ("images", IMAGES, ['{"Repository": "x"}']),
+        ("ps", PS, ["{}"]),
+        ("ps", PS, ['{"Names": "x"}']),
+        ("dangling", DANGLING, ["not an id"]),
+    ],
+)
+def test_unusable_optional_data_is_an_unavailable_source(
+    monkeypatch: pytest.MonkeyPatch, key: str, argv: tuple[str, ...], lines: list[str]
+) -> None:
+    result = invoke(monkeypatch, responses(**{key: ok(argv, lines)}))
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 0
+    assert payload["meta"]["status"] == "partial"
+    assert payload["meta"]["unavailable_sources"][0]["reason"] == "failed"
+    assert payload["data"]["images" if key == "images" else "stopped_containers"] in (
+        [],
+        EXAMPLE["data"]["images"],
+        EXAMPLE["data"]["stopped_containers"],
+    )
+
+
+def test_unparseable_image_size_is_null_and_partial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = json.dumps(
+        {"Repository": "r", "Tag": "t", "ID": "abc123", "Size": "?", "CreatedAt": "x"}
+    )
+
+    payload = json.loads(
+        invoke(monkeypatch, responses(images=ok(IMAGES, [row]))).output
+    )
+
+    assert payload["data"]["images"][0]["docker_reported_size_bytes"] is None
+    assert payload["data"]["images"][0]["raw_size"] == "?"
+    assert payload["meta"]["status"] == "partial"
+
+
+HUGE = "9" * 5000
+
+
+def test_huge_size_string_is_unparseable_not_a_crash() -> None:
+    assert parse_docker_size(HUGE + "GB") is None
+    assert parse_docker_size("1." + HUGE + "GB") is None
+    assert parse_reclaimable(HUGE + "GB (1%)") is None
+
+
+def test_invalid_calendar_date_keeps_the_raw_text() -> None:
+    raw = "2026-13-45 99:99:99 +0000 UTC"
+    assert docker_created_at(raw) == raw
+
+
+def test_huge_size_in_df_is_null_and_partial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = json.dumps(
+        {"Type": "Images", "TotalCount": "1", "Size": HUGE + "GB", "Reclaimable": "0B"}
+    )
+    others = [line for line in df_lines() if '"Images"' not in line]
+
+    result = invoke(monkeypatch, responses(df=ok(DF, [row, *others])))
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 0
+    assert (
+        payload["data"]["findings"][0]["details"]["docker_reported_size_bytes"] is None
+    )
+    assert payload["meta"]["status"] == "partial"
+
+
+HUGE_INT_LINE = '{"Type": "Images", "TotalCount": ' + HUGE + "}"
+DEEP_LINE = "[" * 100000
+
+
+@pytest.mark.parametrize("line", [HUGE_INT_LINE, DEEP_LINE], ids=["bigint", "deep"])
+def test_malformed_df_json_exits_4(monkeypatch: pytest.MonkeyPatch, line: str) -> None:
+    result = invoke(monkeypatch, responses(df=ok(DF, [line])))
+
+    assert result.exit_code == 4
+    assert error_object(result)["code"] == "source_unavailable"
+
+
+@pytest.mark.parametrize("line", [HUGE_INT_LINE, DEEP_LINE], ids=["bigint", "deep"])
+def test_malformed_optional_json_is_an_unavailable_source(
+    monkeypatch: pytest.MonkeyPatch, line: str
+) -> None:
+    result = invoke(monkeypatch, responses(images=ok(IMAGES, [line])))
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 0
+    assert payload["meta"]["status"] == "partial"
+    assert payload["data"]["images"] == []
+
+
+def test_invalid_date_marks_the_source_partial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = json.dumps(
+        {
+            "Names": "n",
+            "Image": "i",
+            "ID": "abc123",
+            "Status": "Exited",
+            "CreatedAt": "2026-13-45 99:99:99 +0000 UTC",
+        }
+    )
+
+    payload = json.loads(invoke(monkeypatch, responses(ps=ok(PS, [row]))).output)
+
+    container = payload["data"]["stopped_containers"][0]
+    assert container["created_at"] == "2026-13-45 99:99:99 +0000 UTC"
+    assert payload["meta"]["status"] == "partial"
+    assert payload["meta"]["unavailable_sources"][0]["source"].startswith("docker ps")
 
 
 @pytest.mark.parametrize("flag", ["-h", "--help"])

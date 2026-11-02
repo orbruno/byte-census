@@ -10,8 +10,9 @@ CLI or a stopped daemon exits 4; the other three sources only add
 """
 
 import json
+import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import click
@@ -62,6 +63,10 @@ CATALOG_ORDER = (
     "docker-volume-prune",
 )
 SHORT_ID = 12
+IMAGE_ID = re.compile(r"^(sha256:)?[0-9a-f]{12,64}$")
+DF_REQUIRED = ("Type", "TotalCount", "Size", "Reclaimable")
+IMAGE_REQUIRED = ("Repository", "Tag", "ID", "Size")
+PS_REQUIRED = ("Names", "ID", "Image", "Status")
 
 Run = Callable[[Sequence[str]], RunResult]
 
@@ -116,6 +121,8 @@ def _json_rows(text: str) -> tuple[dict[str, Any], ...]:
             row = json.loads(line)
         except json.JSONDecodeError as error:
             raise _Unreadable(f"a line is not valid JSON: {error.msg}") from error
+        except (ValueError, RecursionError) as error:
+            raise _Unreadable("a line is too large or too deeply nested") from error
         if not isinstance(row, dict):
             raise _Unreadable("a line is not a JSON object")
         rows.append(row)
@@ -137,10 +144,33 @@ def _read_df(run: Run) -> _Reading:
         raise _df_error(
             f"`docker system df` output is not valid JSON: {error}"
         ) from error
-    return _Reading(rows, None, result.stdout_bytes)
+    valid, dropped = _split_rows(rows, DF_REQUIRED, "Type")
+    if not valid:
+        raise _df_error(
+            "`docker system df` output is unusable: " + (dropped or "it has no rows")
+        )
+    problem = _unavailable(DF, "failed", dropped) if dropped else None
+    return _Reading(valid, problem, result.stdout_bytes)
 
 
-def _read_optional(run: Run, argv: tuple[str, ...], lines: bool) -> _Reading:
+def _split_rows(
+    rows: Sequence[dict[str, Any]], required: tuple[str, ...], label: str
+) -> tuple[tuple[dict[str, Any], ...], str]:
+    """Rows with every required string field, and a note naming the rest."""
+    valid, notes = [], []
+    for row in rows:
+        missing = [k for k in required if not isinstance(row.get(k), str)]
+        if missing:
+            name = row.get(label) if isinstance(row.get(label), str) else "?"
+            notes.append(f"row {name} lacks {', '.join(missing)}")
+        else:
+            valid.append(row)
+    return tuple(valid), "; ".join(notes)
+
+
+def _read_optional(
+    run: Run, argv: tuple[str, ...], required: tuple[str, ...] | None
+) -> _Reading:
     try:
         result = run(argv)
     except RunnerError as error:
@@ -150,11 +180,35 @@ def _read_optional(run: Run, argv: tuple[str, ...], lines: bool) -> _Reading:
         problem = _unavailable(argv, "failed", detail)
         return _Reading(problem=problem, stdout_bytes=result.stdout_bytes)
     try:
-        rows = _plain_rows(result.stdout) if lines else _json_rows(result.stdout)
+        rows = (
+            _plain_rows(result.stdout)
+            if required is None
+            else _json_rows(result.stdout)
+        )
+        if required is not None:
+            rows = _usable_rows(rows, required)
+        else:
+            rows = _usable_ids(rows)
     except _Unreadable as error:
-        problem = _unavailable(argv, "failed", str(error))
+        problem = _unavailable(argv, "failed", f"unusable output: {error}")
         return _Reading(problem=problem, stdout_bytes=result.stdout_bytes)
     return _Reading(rows, None, result.stdout_bytes)
+
+
+def _usable_rows(
+    rows: Sequence[dict[str, Any]], required: tuple[str, ...]
+) -> tuple[dict[str, Any], ...]:
+    valid, dropped = _split_rows(rows, required, required[0])
+    if dropped:
+        raise _Unreadable(dropped)
+    return valid
+
+
+def _usable_ids(rows: Sequence[str]) -> tuple[str, ...]:
+    odd = [row for row in rows if not IMAGE_ID.match(row)]
+    if odd:
+        raise _Unreadable(f"{odd[0]!r} is not an image ID")
+    return tuple(rows)
 
 
 def _plain_rows(text: str) -> tuple[str, ...]:
@@ -168,6 +222,21 @@ def _int_or_none(raw: Any) -> int | None:
         return int(str(raw))
     except ValueError:
         return None
+
+
+def _unparsed(row: dict[str, Any], details: Mapping[str, Any]) -> list[str]:
+    """Notes naming each numeric field of a type that could not be parsed."""
+    fields = {
+        "TotalCount": "total_count",
+        "Active": "active_count",
+        "Size": "docker_reported_size_bytes",
+        "Reclaimable": "docker_reported_reclaimable_bytes",
+    }
+    return [
+        f"{details['docker_type']} {raw} is not a number"
+        for raw, key in fields.items()
+        if details[key] is None and (raw != "Active" or "Active" in row)
+    ]
 
 
 def _type_finding(row: dict[str, Any]) -> Finding:
@@ -200,6 +269,10 @@ def _type_rank(finding: Finding) -> tuple[int, str]:
 
 def _findings(rows: Sequence[dict[str, Any]]) -> tuple[Finding, ...]:
     return tuple(sorted((_type_finding(r) for r in rows), key=_type_rank))
+
+
+def _number_notes(rows: Sequence[dict[str, Any]]) -> list[str]:
+    return [note for row in rows for note in _unparsed(row, _type_finding(row).details)]
 
 
 def _suggestions(findings: Sequence[Finding]) -> tuple[Suggestion, ...]:
@@ -250,9 +323,10 @@ def _container(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _total(findings: Sequence[Finding], key: str) -> int:
-    values = (f.details[key] for f in findings)
-    return sum(v for v in values if v is not None)
+def _total(findings: Sequence[Finding], key: str) -> int | None:
+    """Sum of a field, or null when any component is unknown."""
+    values = [f.details[key] for f in findings]
+    return None if any(v is None for v in values) else sum(values)
 
 
 def _summary(
@@ -271,12 +345,45 @@ def _summary(
     }
 
 
+def _with_notes(
+    reading: _Reading, notes: Sequence[str], argv: tuple[str, ...]
+) -> _Reading:
+    """Mark a source partial when parsed rows hold fields that are not numbers."""
+    if not notes:
+        return reading
+    earlier = [reading.problem.detail] if reading.problem is not None else []
+    detail = "; ".join([*earlier, *notes])
+    return replace(reading, problem=_unavailable(argv, "failed", detail))
+
+
+def _image_notes(rows: Sequence[dict[str, Any]]) -> list[str]:
+    sizes = [
+        f"image {row.get('ID')} Size is not a number"
+        for row in rows
+        if parse_docker_size(str(row["Size"])) is None
+    ]
+    return sizes + _date_notes("image", rows)
+
+
+def _date_notes(label: str, rows: Sequence[dict[str, Any]]) -> list[str]:
+    """Notes for CreatedAt values present but not a recognizable date."""
+    return [
+        f"{label} {row.get('ID')} CreatedAt is not a date"
+        for row in rows
+        if row.get("CreatedAt")
+        and not docker_created_at(str(row["CreatedAt"])).endswith("Z")
+    ]
+
+
 def docker_check(run: Run) -> CheckResult:
     """Run the four reads and assemble the result."""
     usage = _read_df(run)
-    images = _read_optional(run, IMAGES, lines=False)
-    dangling = _read_optional(run, DANGLING, lines=True)
-    stopped = _read_optional(run, PS, lines=False)
+    images = _read_optional(run, IMAGES, IMAGE_REQUIRED)
+    dangling = _read_optional(run, DANGLING, None)
+    stopped = _read_optional(run, PS, PS_REQUIRED)
+    usage = _with_notes(usage, _number_notes(usage.rows), DF)
+    images = _with_notes(images, _image_notes(images.rows), IMAGES)
+    stopped = _with_notes(stopped, _date_notes("container", stopped.rows), PS)
     findings = _findings(usage.rows)
     data = Data(
         summary=_summary(findings, len(dangling.rows), len(stopped.rows)),

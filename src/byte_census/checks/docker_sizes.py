@@ -19,13 +19,17 @@ UNITS = {
     "TB": 1_000_000_000_000,
     "PB": 1_000_000_000_000_000,
 }
+MAX_SIZE_CHARS = 64
 SIZE = re.compile(r"^(\d+)(?:\.(\d+))?\s*([kKMGTP]?B)$")
 CREATED = re.compile(r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{4})\b")
 
 
 def parse_docker_size(raw: str) -> int | None:
     """Bytes for a Docker size string such as `7.42GB`, else `None`."""
-    match = SIZE.match(raw.strip())
+    text = raw.strip()
+    if len(text) > MAX_SIZE_CHARS:
+        return None
+    match = SIZE.match(text)
     if match is None:
         return None
     whole, fraction, unit = match.groups()
@@ -47,5 +51,8 @@ def docker_created_at(raw: str) -> str:
     if match is None:
         return raw
     day, clock, offset = match.groups()
-    moment = datetime.strptime(f"{day} {clock} {offset}", "%Y-%m-%d %H:%M:%S %z")
+    try:
+        moment = datetime.strptime(f"{day} {clock} {offset}", "%Y-%m-%d %H:%M:%S %z")
+    except ValueError:
+        return raw
     return format_captured_at(moment)

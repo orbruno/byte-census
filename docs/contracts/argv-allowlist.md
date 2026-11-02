@@ -52,7 +52,7 @@ Exact argv lists, as the runner compares them:
 | Tool | Write behavior without mitigation | Mitigation | Location variables passed through |
 |---|---|---|---|
 | brew | Some commands auto-update Homebrew, send analytics, and print environment hints. `brew --cache` only prints a path, but the variables make that hold even if Homebrew changes its defaults. | `HOMEBREW_NO_AUTO_UPDATE=1`, `HOMEBREW_NO_ANALYTICS=1`, `HOMEBREW_NO_ENV_HINTS=1` | `HOMEBREW_CACHE` |
-| docker | Not verified. The CLI reads `~/.docker/config.json` and contexts; whether the listed read commands, CLI plugins, or hooks write anything has not been checked, and docker is never executed in tests or investigation. | `DOCKER_CLI_HINTS=false`; only the read-only subcommands in the table can run. | `DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_CONFIG` |
+| docker | Not verified. The CLI reads `~/.docker/config.json` and contexts; whether the listed read commands, CLI plugins, or hooks write anything has not been checked, and docker is never executed in tests or investigation. `DOCKER_HOST` and `DOCKER_CONTEXT` come from the user's own configuration and may make the docker CLI start `ssh` or plugin binaries; this is an accepted residual risk. | `DOCKER_CLI_HINTS=false`; only the read-only subcommands in the table can run. | `DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_CONFIG` |
 | uv | `uv cache dir` prints the cache path without creating it (checked 2026-11-02 with a nonexistent `UV_CACHE_DIR`). | None needed beyond the allowlist. | `UV_CACHE_DIR`, `XDG_CACHE_HOME` |
 | df, diskutil, tmutil | Read-only system tools for the listed arguments. | Pinned absolute paths. | none |
 
