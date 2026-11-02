@@ -112,6 +112,13 @@ All notable changes to this project are recorded here.
   each module, rejects chains that pass through one module to reach another,
   rejects argument unpacking in file openers, and catches aliasing, dynamic
   attribute access, re-exports, and write methods in any position.
+- The AST guard treats every module object, including byte_census modules,
+  as usable only inside an attribute chain, and forbids frame, traceback,
+  and code attributes (`gi_frame`, `f_globals`, `__traceback__`, and others)
+  in any position. Its threat model is documented in the guard and in
+  `docs/contracts/quantities.md`.
+- An npm `cache=` value must be absolute after expanding `~`, `$HOME`, or
+  `${HOME}`; otherwise it is reported in `note` and the next source is used.
 
 ## 2.0.0
 

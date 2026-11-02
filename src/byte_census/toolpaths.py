@@ -5,10 +5,14 @@ debug logs and may create its cache directory. Its cache location is read
 from, in order: the `npm_config_cache` environment variable (matched
 case-insensitively, as npm does), a `cache=` line in `$HOME/.npmrc`, and the
 default `$HOME/.npm`. Global and project npmrc files are not consulted.
-Nothing is created.
+A configured value is expanded (a leading `~`, `$HOME`, `${HOME}`) and must be
+absolute afterwards; otherwise it is reported in `note` and resolution falls
+through to the next source. Nothing is created, and normalization does not
+touch the filesystem.
 """
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -16,6 +20,7 @@ from byte_census.fsread import FsReadError, read_small_file
 
 NPMRC_MAX_BYTES = 1024 * 1024
 NPM_CACHE_KEY = "npm_config_cache"
+_HOME_VARIABLE = re.compile(r"\$\{HOME\}|\$HOME(?![A-Za-z0-9_])")
 
 
 @dataclass(frozen=True)
@@ -27,11 +32,20 @@ class ToolPath:
     note: str | None
 
 
-def _expand(value: str, home: str) -> str:
-    expanded = value.replace("${HOME}", home)
-    if expanded == "~" or expanded.startswith("~/"):
-        return home + expanded[1:]
-    return expanded
+def expand_cache_value(value: str, home: str | None) -> str | None:
+    """Expand `~`, `$HOME`, `${HOME}`; return a normalized absolute path or None."""
+    expanded = value
+    if home is not None:
+        expanded = _HOME_VARIABLE.sub(lambda _: home, expanded)
+        if expanded == "~" or expanded.startswith("~/"):
+            expanded = home + expanded[1:]
+    if not os.path.isabs(expanded):
+        return None
+    return os.path.normpath(expanded)
+
+
+def _joined(notes: list[str]) -> str | None:
+    return "; ".join(notes) if notes else None
 
 
 def _environment_value(environ: Mapping[str, str]) -> tuple[str, str] | None:
@@ -81,14 +95,23 @@ def _npmrc_value(home: str) -> tuple[str, str | None, str | None]:
 
 def npm_cache_location(environ: Mapping[str, str]) -> ToolPath:
     """Resolve the npm cache directory from configuration only."""
-    home = environ.get("HOME")
+    home = environ.get("HOME") or None
+    notes: list[str] = []
     from_env = _environment_value(environ)
     if from_env is not None:
         name, value = from_env
-        return ToolPath(_expand(value, home) if home else value, f"env:{name}", None)
-    if not home:
-        return ToolPath(None, "unresolved", "HOME is not set")
+        path = expand_cache_value(value, home)
+        if path is not None:
+            return ToolPath(path, f"env:{name}", None)
+        notes.append(f"cache_not_absolute: env:{name} {value!r}")
+    if home is None or not os.path.isabs(home):
+        reason = "HOME is not set" if home is None else "HOME is not absolute"
+        return ToolPath(None, "unresolved", _joined([*notes, reason]))
     rc_path, value, note = _npmrc_value(home)
+    notes.extend([note] if note else [])
     if value is not None:
-        return ToolPath(_expand(value, home), f"npmrc:{rc_path}", None)
-    return ToolPath(os.path.join(home, ".npm"), "default", note)
+        path = expand_cache_value(value, home)
+        if path is not None:
+            return ToolPath(path, f"npmrc:{rc_path}", _joined(notes))
+        notes.append(f"cache_not_absolute: npmrc:{rc_path} {value!r}")
+    return ToolPath(os.path.join(home, ".npm"), "default", _joined(notes))

@@ -10,6 +10,7 @@ the runner or the writer.
 """
 
 import sys
+from pathlib import Path
 
 RUNNER = "byte_census/runner.py"
 WRITER = "byte_census/legacy/report_writer.py"
@@ -150,11 +151,30 @@ FORBIDDEN_BUILTINS = frozenset(
 ATTR_BUILTINS = frozenset({"getattr", "setattr", "delattr"})
 WATCHED_BUILTINS = FORBIDDEN_BUILTINS | ATTR_BUILTINS | {"open"}
 
-FORBIDDEN_DUNDERS = frozenset(
+# Introspection attributes that reach globals, builtins, frames, or code
+# objects. Forbidden in any attribute position and as getattr names.
+FORBIDDEN_ATTRIBUTES = frozenset(
     {"__dict__", "__globals__", "__builtins__", "__subclasses__", "__class__"}
     | {"__bases__", "__mro__", "__code__", "__closure__", "__getattribute__"}
     | {"__import__", "__loader__", "__spec__", "__self__", "__func__"}
+    | {"__traceback__", "__reduce__", "__reduce_ex__"}
+    | {"gi_frame", "cr_frame", "ag_frame", "gi_code", "cr_code", "ag_code"}
+    | {"tb_frame", "tb_next", "f_globals", "f_builtins", "f_locals", "f_back"}
+    | {"f_code"}
 )
+
+
+def _package_modules(src_dir: Path, package: str) -> frozenset[str]:
+    """Dotted names of every module and subpackage of a package under src_dir."""
+    names: set[str] = set()
+    for path in (src_dir / package).rglob("*.py"):
+        parts = path.relative_to(src_dir).with_suffix("").parts
+        names.add(".".join(parts[:-1] if parts[-1] == "__init__" else parts))
+    return frozenset(names)
+
+
+SRC_DIR = Path(__file__).resolve().parents[2] / "src"
+PACKAGE_MODULES = _package_modules(SRC_DIR, "byte_census")
 
 # Method names that write, in any attribute position (Path, os-like objects,
 # rich Console). `write` is excluded: errors.py writes to a TextIO stream,
@@ -186,6 +206,11 @@ def outside(category: str) -> str:
     if category == MULTIPROCESSING:
         return "is forbidden until WI-PARALLEL-WALK names a traversal module"
     return "is forbidden"
+
+
+def is_module_object(name: str) -> bool:
+    """Report whether a resolved name denotes a module object."""
+    return name in VALUE_RESTRICTED or name in PACKAGE_MODULES
 
 
 def module_allowed(name: str) -> bool:
@@ -260,7 +285,7 @@ def _classify_deeper(
 def classify(name: str) -> tuple[str, str] | None:
     """Return (category, reason) for a resolved dotted name, or None if allowed."""
     parts = name.split(".")
-    dunder = next((p for p in parts if p in FORBIDDEN_DUNDERS), None)
+    dunder = next((p for p in parts if p in FORBIDDEN_ATTRIBUTES), None)
     if dunder is not None:
         return FORBIDDEN, f"{dunder} access is forbidden"
     if under(name, "byte_census"):

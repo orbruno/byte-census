@@ -544,3 +544,88 @@ def test_second_review_bypasses_are_caught(source: str, fragment: str) -> None:
 )
 def test_allowlisted_attribute_use_passes(source: str) -> None:
     assert violations(source) == []
+
+
+# Third review: package modules as values, frame and traceback attributes.
+
+THIRD_REVIEW_BYPASSES = [
+    ("from byte_census import fsread\nm = fsread\nm.os.system('x')\n", "fsread"),
+    ("from byte_census import fsread\n[fsread][0].os.system('x')\n", "fsread"),
+    ("from byte_census import fsread\nfsread.os.system('x')\n", "reaches os"),
+    ("import byte_census.fsread\nm = byte_census.fsread\n", "used as a value"),
+    ("import byte_census\nm = byte_census\n", "used as a value"),
+    ("from byte_census import legacy\nm = legacy\n", "used as a value"),
+    ("from byte_census.legacy import scan\nhelper(scan)\n", "used as a value"),
+    ("from . import runner\nm = runner\n", "used as a value"),
+    ("g.gi_frame.f_builtins['open'](p, 'w')\n", "gi_frame"),
+    ("g.gi_frame.f_builtins['open'](p, 'w')\n", "f_builtins"),
+    ("g.gi_frame.f_globals['os'].system('x')\n", "f_globals"),
+    ("e.__traceback__.tb_frame.f_builtins['open']\n", "__traceback__"),
+    ("e.__traceback__.tb_frame.f_builtins['open']\n", "tb_frame"),
+    ("x = c.cr_frame\n", "cr_frame"),
+    ("x = a.ag_frame\n", "ag_frame"),
+    ("x = g.gi_code\n", "gi_code"),
+    ("x = c.cr_code\n", "cr_code"),
+    ("x = t.tb_next\n", "tb_next"),
+    ("x = f.f_locals\n", "f_locals"),
+    ("x = f.f_back\n", "f_back"),
+    ("x = f.f_code\n", "f_code"),
+    ("x = o.__reduce__()\n", "__reduce__"),
+    ("x = getattr(g, 'gi_frame')\n", "gi_frame"),
+    ("from byte_census import fsread\nx = fsread.__traceback__\n", "__traceback__"),
+]
+
+
+@pytest.mark.parametrize(
+    ("source", "fragment"),
+    THIRD_REVIEW_BYPASSES,
+    ids=[b[0] for b in THIRD_REVIEW_BYPASSES],
+)
+def test_third_review_bypasses_are_caught(source: str, fragment: str) -> None:
+    assert_flags(source, fragment)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from byte_census import fsread\nfsread.walk('.')\n",
+        "from byte_census.fsread import walk\nhelper(walk)\n",
+        "from byte_census.render import render\nrender({}, 'json')\n",
+        "from byte_census import runner\nerror = runner.RunnerError\n",
+    ],
+)
+def test_package_names_that_are_not_modules_pass(source: str) -> None:
+    assert violations(source) == []
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "gi_frame",
+        "cr_frame",
+        "ag_frame",
+        "gi_code",
+        "cr_code",
+        "tb_frame",
+        "tb_next",
+        "f_globals",
+        "f_builtins",
+        "f_locals",
+        "f_back",
+        "f_code",
+        "__traceback__",
+        "__globals__",
+        "__code__",
+        "__closure__",
+        "__func__",
+        "__self__",
+        "__subclasses__",
+        "__bases__",
+        "__mro__",
+        "__getattribute__",
+        "__reduce__",
+    ],
+)
+def test_introspection_attributes_are_forbidden_in_any_position(name: str) -> None:
+    assert_flags(f"x = y.{name}\n", name)
+    assert_flags(f"import os\nx = os.{name}\n", name)

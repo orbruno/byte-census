@@ -1,5 +1,19 @@
 """AST read-only guard for the byte_census package (WI-SAFETY AC-03).
 
+Threat model:
+
+- The guard prevents accidental writes, process launches, and downloads by
+  contributors: a call to a write, process, or network-capable API outside
+  the module allowed to make it fails the test suite.
+- It is defense in depth, not a sandbox. Code deliberately written to evade
+  static analysis can defeat any AST check; the guard does not claim
+  otherwise.
+- Behavior tests are the primary evidence of the read-only guarantee: the
+  unchanged-fixture test, the runner rejection tests, and the fsread tests.
+- Reviews judge the guard against this threat model: a finding is a way
+  ordinary, non-adversarial code could write, launch a process, or trigger a
+  download without the guard noticing.
+
 The guard is an allowlist (policy in guard_policy.py):
 
 - every import, including resolved relative imports, must name an allowed
@@ -37,8 +51,8 @@ from tests.support.guard_policy import (
     ATTRIBUTE_ALLOWLISTS,
     CONDITIONAL_ATTRIBUTES,
     FORBIDDEN,
+    FORBIDDEN_ATTRIBUTES,
     FORBIDDEN_BUILTINS,
-    FORBIDDEN_DUNDERS,
     MODE_OPENERS,
     MODULE_ALLOWLIST,
     MULTIPROCESSING,
@@ -47,12 +61,12 @@ from tests.support.guard_policy import (
     PACKAGE_ALLOWLIST,
     PROCESS,
     RUNNER,
-    VALUE_RESTRICTED,
     WATCHED_BUILTINS,
     WRITE,
     WRITE_ATTRIBUTES,
     WRITER,
     classify,
+    is_module_object,
     module_allowed,
     outside,
     under,
@@ -214,7 +228,7 @@ class _Guard(ast.NodeVisitor):
             return
         if name.startswith("builtins."):
             self.check_builtin_value(node)
-        elif name in VALUE_RESTRICTED:
+        elif is_module_object(name):
             self.report(node, FORBIDDEN, f"{name} used as a value is forbidden")
         else:
             self.check_name(node, name)
@@ -234,14 +248,14 @@ class _Guard(ast.NodeVisitor):
         if name is None:
             self.check_attribute(node, call)
             self.generic_visit(node)
-        elif name in VALUE_RESTRICTED and call is None:
+        elif is_module_object(name) and call is None:
             self.report(node, FORBIDDEN, f"{name} used as a value is forbidden")
         else:
             self.check_name(node, name)
 
     def check_attribute(self, node: ast.Attribute, call: ast.Call | None) -> None:
         attr = node.attr
-        if attr in FORBIDDEN_DUNDERS:
+        if attr in FORBIDDEN_ATTRIBUTES:
             self.report(node, FORBIDDEN, f"{attr} access is forbidden")
         elif _writes(attr, call):
             self.report(node, WRITE, f"Path.{attr} {outside(WRITE)}")
@@ -301,7 +315,7 @@ class _Guard(ast.NodeVisitor):
             self.check_constant_attr(node, attr.value)
 
     def check_constant_attr(self, node: ast.Call, attr: str) -> None:
-        if attr in FORBIDDEN_DUNDERS:
+        if attr in FORBIDDEN_ATTRIBUTES:
             self.report(node, FORBIDDEN, f"{attr} access is forbidden")
         elif attr in WRITE_ATTRIBUTES or attr in CONDITIONAL_ATTRIBUTES:
             self.report(node, WRITE, f"Path.{attr} {outside(WRITE)}")

@@ -161,3 +161,72 @@ def test_result_is_immutable(tmp_path: Path) -> None:
 
     with pytest.raises(AttributeError):
         result.path = "/"  # type: ignore[misc]
+
+
+# Third review: cache values must be absolute after expansion.
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("~/c", "{home}/c"),
+        ("~", "{home}"),
+        ("$HOME/c", "{home}/c"),
+        ("${HOME}/c", "{home}/c"),
+        ("/a/./b/../c//", "/a/c"),
+        ("~/x/../y", "{home}/y"),
+    ],
+)
+def test_npmrc_value_is_expanded_and_normalized(
+    tmp_path: Path, value: str, expected: str
+) -> None:
+    write_npmrc(tmp_path, f"cache={value}\n")
+
+    result = npm_cache_location({"HOME": str(tmp_path)})
+
+    assert result.path == expected.format(home=tmp_path)
+    assert result.note is None
+
+
+@pytest.mark.parametrize("value", ["relative/cache", "~user/cache", "$HOMEX/c", "./c"])
+def test_npmrc_relative_value_falls_back_to_default_with_note(
+    tmp_path: Path, value: str
+) -> None:
+    rc = write_npmrc(tmp_path, f"cache={value}\n")
+
+    result = npm_cache_location({"HOME": str(tmp_path)})
+
+    assert result.path == str(tmp_path / ".npm")
+    assert result.source == "default"
+    assert result.note == f"cache_not_absolute: npmrc:{rc} {value!r}"
+
+
+def test_relative_environment_value_falls_back_with_note(tmp_path: Path) -> None:
+    write_npmrc(tmp_path, "cache=/from/npmrc\n")
+
+    result = npm_cache_location({"HOME": str(tmp_path), "npm_config_cache": "rel"})
+
+    assert result.path == "/from/npmrc"
+    assert result.note == "cache_not_absolute: env:npm_config_cache 'rel'"
+
+
+def test_tilde_without_home_is_not_absolute() -> None:
+    result = npm_cache_location({"npm_config_cache": "~/c"})
+
+    assert result == ToolPath(
+        None,
+        "unresolved",
+        "cache_not_absolute: env:npm_config_cache '~/c'; HOME is not set",
+    )
+
+
+def test_absolute_environment_value_without_home_is_used() -> None:
+    result = npm_cache_location({"npm_config_cache": "/abs//c/"})
+
+    assert result == ToolPath("/abs/c", "env:npm_config_cache", None)
+
+
+def test_relative_home_is_unresolved() -> None:
+    assert npm_cache_location({"HOME": "relative/home"}) == ToolPath(
+        None, "unresolved", "HOME is not absolute"
+    )

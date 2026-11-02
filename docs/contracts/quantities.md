@@ -82,6 +82,10 @@ Docker figures are informational. They describe space inside Docker's own storag
 - Docker findings carry `logical_bytes: null`, `allocated_bytes: null`, `reclaimable_estimate_bytes: null`, and the caveat `docker_reported_not_host`.
 - On the host, the Docker disk image appears once as an ordinary file in disk map (with `see_check: "docker scan"`), measured by its own `lstat` like any other file.
 
+## Read-only guarantee and threat model
+
+byte-census never modifies user data, never runs a command outside the argv allowlist ([argv-allowlist.md](argv-allowlist.md)), and never opens a dataless file. Its AST guard (`tests/support/read_only_guard.py`) prevents accidental writes, process launches, and downloads by contributors. The guard is defense in depth, not a sandbox against code deliberately written to evade static analysis. The primary evidence for the guarantee is behavior tests: the unchanged-fixture test (contents and modification times stay identical after a scan), the runner rejection tests, and the fsread tests for FIFOs, symlinks, devices, dataless files, and identity changes. Reviews judge the guard against this threat model: a finding is a way ordinary code could write, launch a process, or trigger a download without the guard noticing.
+
 ## Limitations
 
 - APFS clones and shared extents: a cloned file reports full `st_blocks` even though its extents are shared with another file. Traversal totals therefore cannot guarantee how much space a removal frees. Every finding with a reclaim estimate carries the caveat `apfs_clone_or_shared_extent`. uv clones `.venv` files from its cache on APFS, so artifact sizes in particular can overstate what removal frees.
