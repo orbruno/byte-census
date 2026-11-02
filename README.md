@@ -25,6 +25,7 @@ Verification: Nine unit and CLI regressions passed on 2026-08-28
 cd duplicate-finder-cli
 uv sync
 uv run dupfind --help
+uv run byte-census --version
 ```
 
 This creates the project environment and runs the command through the locked
@@ -169,6 +170,10 @@ Usage: dupfind [OPTIONS] PATH
 
   PATH is the directory to scan for duplicates.
 
+  Example:
+
+      dupfind . --format json
+
 Options:
   -c, --compare PATH              Compare with another directory
   -r, --recursive / -R, --no-recursive
@@ -177,7 +182,7 @@ Options:
   -o, --output PATH               Save results to file
   --min-size INTEGER              Minimum file size in bytes (default: 0)
   -q, --quiet                     Suppress progress output
-  --help                          Show this message and exit
+  -h, --help                      Show this message and exit
 ```
 
 ## How It Works

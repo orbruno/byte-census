@@ -10,10 +10,10 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from duplicate_finder_cli.main import (
-    calculate_hash,
+from byte_census.legacy.dupfind import find
+from byte_census.legacy.hashing import calculate_hash
+from byte_census.legacy.scan import (
     collect_files,
-    find,
     find_duplicates_compare,
     find_duplicates_single,
 )
@@ -63,7 +63,7 @@ class DuplicateFinderTests(unittest.TestCase):
         self.write_file("scan/unique.txt", b"a different size")
 
         with patch(
-            "duplicate_finder_cli.main.calculate_hash", wraps=calculate_hash
+            "byte_census.legacy.scan.calculate_hash", wraps=calculate_hash
         ) as mocked_hash:
             find_duplicates_single(self.root / "scan", quiet=True)
 

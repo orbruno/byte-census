@@ -1,6 +1,6 @@
 [project]
-name = "duplicate-finder-cli"
-version = "1.0.0"
+name = "byte-census"
+version = "2.0.0"
 description = "CLI tool for finding and managing duplicate files using cryptographic hashing"
 authors = [{name = "Orlando Bruno"}]
 readme = "README.md"
@@ -14,8 +14,22 @@ dependencies = [
 Repository = "https://github.com/orbruno/duplicate-finder-cli"
 
 [project.scripts]
-dupfind = "duplicate_finder_cli.main:cli"
+byte-census = "byte_census.cli:main"
+dupfind = "byte_census.legacy.dupfind:cli"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/byte_census"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+extend-exclude = ["docs/benchmarks"]
